@@ -1,0 +1,30 @@
+PostgreSQL Query Analyzer (PGQA) is a major mode to analyze SQL queries for
+PostgreSQL database server.
+
+The development is in very early stage now. If you miss any feature, consider
+contribution to the project or just check later. If you think you've found a
+bug, please report it.
+
+The development takes place at https://notabug.org/ah/pgqa
+
+Installation
+------------
+
+First, make sure you have GNU Emacs 25 (or later) installed.
+
+Second, copy the pgqa directory to the directory you usually install Elisp
+packages into - typically "~/.emacs.d/lisp/pgqa/".
+
+Then add the following lines to the init file of GNU Emacs (adjust load-path
+value if you decided to installed the package to a different directory):
+
+(add-to-list 'load-path "~/.emacs.d/lisp/pgqa/")
+(autoload 'pgqa-mode "pgqa" "This function brings buffer to pgqa-mode." t)
+(add-to-list 'auto-mode-alist (cons "\\.sql\\'" 'pgqa-mode))
+
+Finally restart the GNU Emacs editor. Once you open a file having ".sql"
+suffix, major mode of the containing buffer should automatically become
+'pgqa-mode.  If the file has different suffix, or if you don't want to modify
+'auto-mode-alist, you can use the following command to activate the mode:
+
+	M-x pgqa-mode
