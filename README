@@ -43,9 +43,8 @@ not discarded):
 
 	export EMACSLOADPATH=:~/.emacs.d/lisp/pgqa/
 
-Then run GNU Emacs this way (query.sql is your SQL script):
+Then run GNU Emacs this way (query.sql is the file containing your SQL query):
 
-	emacs -batch --insert query.sql -l pgqa.el -f pgqa-mode \
--f pgqa-format-query-batch
+	emacs -batch --insert query.sql -l pgqa.el -f pgqa-format-query-batch
 
 The formatted query should be sent to the standard output.

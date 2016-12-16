@@ -442,6 +442,12 @@ from first position of the query."
   "Read SQL query from the standard input, format it and write it to the
 standard output."
 
+  (if (null noninteractive)
+      (user-error "pgqa-format-query-batch function should only be used in
+batch mode"))
+
+  (pgqa-mode)
+
   (let ((state))
     (pgqa-check-customizations)
     (pgqa-parse)
