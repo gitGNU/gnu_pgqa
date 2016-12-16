@@ -235,11 +235,13 @@ characters."
 (defun pgqa-get-nonterm-region-pos(region node start)
   "Retrieve start or end position from $regionN Wisent variable or from node,
 whichever is available."
-  (let ((vec))
-    (if region
-	(setq vec (car region))
-      (setq vec (oref node region)))
-    (elt vec (if start 0 1))))
+  (if noninteractive
+      nil
+    (let ((vec))
+      (if region
+	  (setq vec (car region))
+	(setq vec (oref node region)))
+      (elt vec (if start 0 1)))))
 
 
 ;; Wisent only seems to support the $region variable for simple non-terminals
@@ -248,14 +250,18 @@ whichever is available."
 ;; the start position from the first region and the end position from the
 ;; last one.
 (defun pgqa-union-regions(region-1 node-1 region-2 node-2)
-  (vector
-   (pgqa-get-nonterm-region-pos region-1 node-1 t)
-   (pgqa-get-nonterm-region-pos region-2 node-2 nil)))
+  (if noninteractive
+      nil
+    (vector
+     (pgqa-get-nonterm-region-pos region-1 node-1 t)
+     (pgqa-get-nonterm-region-pos region-2 node-2 nil))))
 
 ;; Get the region in list format from a single nonterm.
 (defun pgqa-get-nonterm-region(region node)
-  (list (pgqa-get-nonterm-region-pos region node t)
-	(pgqa-get-nonterm-region-pos region node nil)))
+  (if noninteractive
+      nil
+    (list (pgqa-get-nonterm-region-pos region node t)
+	  (pgqa-get-nonterm-region-pos region node nil))))
 
 (defun pgqa-init-parser ()
   (setq pgqa-keyword-hash (makehash 'equal))
@@ -965,11 +971,17 @@ whichever is available."
 it's replaced."
   (interactive)
 
+  (if (and (not noninteractive) (not (equal major-mode 'pgqa-mode)))
+      (user-error "Only contents of query buffer can be parsed."))
+
+  (pgqa-parse-common))
+
+(defun pgqa-parse-common ()
+  "Parsing functionality used for both interactive and batch mode."
   (setq pgqa-parse-error nil)
 
-  (if (not (equal major-mode 'pgqa-mode))
-      (user-error "Only contents of query buffer can be parsed."))
-  (if (or (null pgqa-automaton) (not (null pgqa-parser-always-init)))
+  (if (or (null pgqa-automaton) pgqa-parser-always-init
+	  noninteractive)
       (pgqa-init-parser))
 
   ;; TODO Check this needs to be repeated. Currently it seems related to
@@ -998,9 +1010,9 @@ it's replaced."
   ;; Only update the existing tree if the parsing did complete.
   (if (null pgqa-parse-error)
       (progn
-	(pgqa-set-markers result)
-	(setq pgqa-query-tree result)
-	))
+	(if (null noninteractive)
+	    (pgqa-set-markers result))
+	(setq pgqa-query-tree result)))
   )
 
 ;; TODO Update markers during deparsing. (Should pgqa-set-markers take care?)
@@ -1120,5 +1132,11 @@ in front of each line."
       (pgqa-mode))
     )
   )
+
+(defun pgqa-deparse-batch ()
+  "Deparse query in batch mode"
+  (setq state (pgqa-init-deparse-state 0 0))
+  (pgqa-dump pgqa-query-tree state 0)
+  state)
 
 (provide 'pgqa-parser)

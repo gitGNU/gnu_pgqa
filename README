@@ -7,6 +7,7 @@ bug, please report it.
 
 The development takes place at https://notabug.org/ah/pgqa
 
+
 Installation
 ------------
 
@@ -28,3 +29,23 @@ suffix, major mode of the containing buffer should automatically become
 'auto-mode-alist, you can use the following command to activate the mode:
 
 	M-x pgqa-mode
+
+Once the mode has been activated, "PGQA" menu should appear in the menu bar.
+
+
+Batch mode
+----------
+
+PGQA can be used to format queries in batch mode. To ensure that the code gets
+loaded, add the containing directory to the value of EMACSLOADPATH. For
+example (the initial colon ensures that the existing value of 'load-path is
+not discarded):
+
+	export EMACSLOADPATH=:~/.emacs.d/lisp/pgqa/
+
+Then run GNU Emacs this way (query.sql is your SQL script):
+
+	emacs -batch --insert query.sql -l pgqa.el -f pgqa-mode \
+-f pgqa-format-query-batch
+
+The formatted query should be sent to the standard output.

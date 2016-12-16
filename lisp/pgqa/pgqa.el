@@ -15,6 +15,7 @@
 ;; You should have received a copy of the GNU General Public License qalong
 ;; with PGQA. If not, see <http://www.gnu.org/licenses/>.
 
+(require 'seq)
 (require 'semantic)
 ;(require 'wisent)
 (require 'pgqa-node)
@@ -436,5 +437,15 @@ from first position of the query."
 
  (pgqa-parse)
  (pgqa-deparse indent))
+
+(defun pgqa-format-query-batch ()
+  "Read SQL query from the standard input, format it and write it to the
+standard output."
+
+  (let ((state))
+    (pgqa-check-customizations)
+    (pgqa-parse)
+    (setq state (pgqa-deparse-batch))
+    (princ (oref state result))))
 
 (provide 'pgqa)
