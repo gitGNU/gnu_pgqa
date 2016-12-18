@@ -612,7 +612,8 @@ operator. nil indicates it's a prefix operator.")
 	     (next-space-backup)
 	     (arg-is-operator (eq (eieio-object-class arg) 'pgqa-operator))
 	     (arg-is-comma (and arg-is-operator (string= (oref arg op) ",")))
-	     (arg-multiline))
+	     (arg-multiline)
+	     (indent-arg indent))
 
 	(if (eq (eieio-object-class arg) 'pgqa-target-entry)
 	    (setq arg-multiline (pgqa-is-multiline-operator (oref arg expr)))
@@ -691,13 +692,13 @@ operator. nil indicates it's a prefix operator.")
 
 	;; Serialize the argument now, giving it additional indentation if
 	;; user wants the output structured.
-	(let ((indent-arg indent)
-	      (indent-extra 0))
+	(let ((indent-extra 0))
 	  (if multiline
-	      (setq indent-extra (1+ indent-extra)))
-	  ;; The extra indentation due to parentheses, mentioned above.
-	  (if parens
-	      (setq indent-extra (1+ indent-extra)))
+	      (progn
+		(setq indent-extra (1+ indent-extra))
+		;; The extra indentation due to parentheses, mentioned above.
+		(if parens
+		    (setq indent-extra (1+ indent-extra)))))
 	  (setq indent-arg (+ indent indent-extra))
 	  (pgqa-dump arg state indent-arg))
 
@@ -722,7 +723,7 @@ operator. nil indicates it's a prefix operator.")
 	      ;; allow for line break between opening paren and the following
 	      ;; character or closing paren and the preceding character.
 	      (let ((fill-column (1- fill-column)))
-		(pgqa-dump arg state indent))
+		(pgqa-dump arg state indent-arg))
 	      )
 	  )
 
