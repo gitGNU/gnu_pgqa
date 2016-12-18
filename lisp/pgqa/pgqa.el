@@ -47,7 +47,7 @@ Can only be set if `pgqa-multiline-join' variable is set."
   :type 'boolean
 )
 
-(defcustom pgqa-multiline-operator t
+(defcustom pgqa-multiline-operator nil
   "If non-nil, operators will be deparsed in a structured way.
 
 Can only be set if both `pgqa-multiline-query' and `pgqa-multiline-join'
