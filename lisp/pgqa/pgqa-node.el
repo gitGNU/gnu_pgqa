@@ -214,9 +214,8 @@ indented."
 
     (pgqa-deparse-string state keyword indent)
 
-    ;; Ensure the appropriate space in front of the following expression if
-    ;; appropriate.
-    (if pgqa-multiline-query
+    (if (and pgqa-multiline-query (null pgqa-clause-newline))
+	;; Ensure the appropriate space in front of the following expression.
 	(let* ((indent-top-expr (oref state indent-top-expr))
 	       (nspaces (- (* indent-top-expr tab-width) (string-width keyword))))
 
@@ -243,6 +242,11 @@ indented."
 	  (oset state next-space nspaces))
       )
     )
+
+  (if pgqa-clause-newline
+      ;; Avoid the single space that pgqa-dump of pgqa-operator class puts in
+      ;; front of operators.
+      (oset state next-space 0))
   )
 
 (defclass pgqa-query (pgqa-node)
@@ -296,17 +300,19 @@ indented."
 	(oset state indent-top-expr (/ max-width tab-width)))
     )
 
-  (if (string= (oref node kind) "SELECT")
+  (if (string= (oref node kind) "SELECT")
       (let ((te (oref node target-expr))
 	    (indent-clause (1+ indent)))
 	(pgqa-deparse-top-keyword state "SELECT" indent t)
 
 	;; Start on a new line if the first target entry would start at higher
-	;; column thant any other one.
+	;; column than any other one.
 	;;
 	;; TODO The same for GROUP BY / ORDER BY.
-	(if pgqa-multiline-operator
-	    (pgqa-prepare-comma-dump te state indent))
+	(if (and pgqa-multiline-operator (null pgqa-clause-newline))
+	    (pgqa-prepare-comma-dump te state indent)
+	  (if pgqa-clause-newline
+	      (pgqa-deparse-newline state indent-clause)))
 
 	(pgqa-dump te state indent-clause)))
 
@@ -333,14 +339,17 @@ indented."
 )
 
 (defmethod pgqa-dump ((node pgqa-from-expr) state indent)
-  (let ((from-list (oref node from-list)))
+  (let ((from-list (oref node from-list))
+	(indent-clause (1+ indent)))
     ;; INSERT, UPDATE or DELETE statement can have the list empty.
     (if (> (length from-list) 0)
 	(progn
 	  (pgqa-deparse-top-keyword state "FROM" indent nil)
+	  (if pgqa-clause-newline
+	      (pgqa-deparse-newline state indent-clause))
 
 	  (if (= (length from-list) 1)
-	      (pgqa-dump (car from-list) state (1+ indent))
+	      (pgqa-dump (car from-list) state indent-clause)
 	    ;; Line breaks and indentation are best handled if we turn the list
 	    ;; into a comma operator.
 	    ;;
@@ -350,7 +359,7 @@ indented."
 				    :args from-list
 				    :prec pgqa-precedence-comma))
 		  )
-	      (pgqa-dump l state (1+ indent))
+	      (pgqa-dump l state indent-clause)
 	      )
 	    )
 	  )
@@ -358,10 +367,12 @@ indented."
     )
 
   (if (slot-boundp node 'qual)
-      (progn
+      (let ((indent-clause (1+ indent)))
 	;; `space' should be up-to-date as the FROM clause is mandatory.
 	(pgqa-deparse-top-keyword state "WHERE" indent nil)
-	(pgqa-dump (oref node qual) state (1+ indent))))
+	(if pgqa-clause-newline
+	    (pgqa-deparse-newline state indent-clause))
+	(pgqa-dump (oref node qual) state indent-clause)))
   )
 
 ;; A single argument represents table, function, subquery or VALUES clause. If
@@ -518,8 +529,7 @@ operator. nil indicates it's a prefix operator.")
 
   (if (and pgqa-multiline-operator
 	   (eq (eieio-object-class node) 'pgqa-operator))
-      (let ((op (oref node op))
-	    (args (oref node args)))
+      (let ((op (oref node op)))
 
 	;; Comma is not a multi-line operator as such, only its arguments
 	;; are.
@@ -559,7 +569,10 @@ operator. nil indicates it's a prefix operator.")
 	 ;; needs to be printed out in front of the first argument.)
 	 (>=
 	  (oref state next-column)
-	  (* indent-clause tab-width)))
+	  (* indent-clause tab-width))
+	 ;; pgqa-clause-newline will break the line on its own, so do nothing
+	 ;; here.
+	 (null pgqa-clause-newline))
 
 	(progn
 	  ;; Find the first object to be printed out structured.
@@ -585,6 +598,27 @@ operator. nil indicates it's a prefix operator.")
 	  )
       )
     )
+  )
+
+;; indent relates to the operator, not argument.
+(defun pgqa-indent-operator-first-argument (state indent)
+  "Prepare position for the first argument of an operator."
+
+  (if
+      ;; No duplicate newline if we already have one.
+      (and pgqa-clause-newline (= i 0)
+	   (= (% (oref state next-column) tab-width) 0))
+      (let ((indent-extra (- indent (/ (oref state next-column) tab-width))))
+	;; indent is for the operator, so add 1 more level for the argument.
+	(setq indent-extra (1+ indent-extra))
+	(oset state result
+	      (concat (oref state result)
+		      (make-string (* indent-extra tab-width) 32))))
+    (progn
+      (pgqa-deparse-newline state (1+ indent))
+      ;; No space in front of the "(", in addition to the
+      ;; indentation.
+      (oset state next-space 0)))
   )
 
 (defmethod pgqa-dump ((node pgqa-operator) state indent)
@@ -648,11 +682,10 @@ operator. nil indicates it's a prefix operator.")
 	    ;; argument of the unary operator is operator itself (which
 	    ;; includes parentheses), it'll take care of the line breaks
 	    ;; automatically.
-	    (if (and (null arg-is-operator) (> (length args) 1))
-		(progn
-		  (pgqa-deparse-newline state (1+ indent))
-		  (oset state next-space 0))
-	      )
+	    (if (and
+		 (null arg-is-operator)
+		 (> (length args) 1))
+		(pgqa-indent-operator-first-argument state indent))
 	  ;; If an "ordinary" expression follows a multi-line operator within
 	  ;; comma operator (e.g. SELECT list), break the line so that the
 	  ;; multi-line operator does not share even a single line with the
@@ -670,11 +703,7 @@ operator. nil indicates it's a prefix operator.")
 		  ;; "(" should appear on a new line, indented as the argument
 		  ;; would be if there were no parentheses. (The argument
 		  ;; itself will eventually be given extra indentation.)
-		  (progn
-		    (pgqa-deparse-newline state (1+ indent))
-		    ;; No space in front of the "(", in addition to the
-		    ;; indentation.
-		    (oset state next-space 0)))
+		  (pgqa-indent-operator-first-argument state indent))
 
 	      (pgqa-deparse-string state "(" indent)
 	      ;; No space, whatever follows "(".
