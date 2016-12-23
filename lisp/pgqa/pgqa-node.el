@@ -601,24 +601,41 @@ operator. nil indicates it's a prefix operator.")
   )
 
 ;; indent relates to the operator, not argument.
-(defun pgqa-indent-operator-first-argument (state indent)
-  "Prepare position for the first argument of an operator."
+(defun pgqa-indent-operator-first-argument (state indent arg-idx)
+  "Prepare position for the first argument of a multiline operator."
 
-  (if
-      ;; No duplicate newline if we already have one.
-      (and pgqa-clause-newline (= i 0)
-	   (= (% (oref state next-column) tab-width) 0))
-      (let ((indent-extra (- indent (/ (oref state next-column) tab-width))))
-	;; indent is for the operator, so add 1 more level for the argument.
-	(setq indent-extra (1+ indent-extra))
-	(oset state result
-	      (concat (oref state result)
-		      (make-string (* indent-extra tab-width) 32))))
-    (progn
-      (pgqa-deparse-newline state (1+ indent))
-      ;; No space in front of the "(", in addition to the
-      ;; indentation.
-      (oset state next-space 0)))
+  (let* ((s (oref state result))
+	 (i (1- (length s)))
+	 (last)
+	 (done)
+	 (non-white))
+    ;; For the first argument we need to know whether we should break the
+    ;; line.
+    (if (= arg-idx 0)
+	;; Find out whether the current line contains a non-white character.
+	(while (and (null done) (>= i 0))
+	  (setq last (substring s i (1+ i)))
+	  (if (string= last "\n")
+	      (setq done t)
+	    (let ((non-white-match (string-match "\\S-" last)))
+	      (if (eq non-white-match 0)
+		  (progn
+		    (setq non-white t)
+		    (setq done t)))))
+	  (setq i (1- i))))
+
+    (if
+	;; No duplicate newline if we already have one.
+	(and pgqa-clause-newline (= arg-idx 0) (null non-white))
+	(let ((indent-extra (- indent (/ (oref state next-column) tab-width))))
+	  ;; indent is for the operator, so add 1 more level for the argument.
+	  (setq indent-extra (1+ indent-extra))
+	  (oset state result
+		(concat (oref state result)
+			(make-string (* indent-extra tab-width) 32))))
+      (progn
+	(pgqa-deparse-newline state (1+ indent))
+	(oset state next-space 0))))
   )
 
 (defmethod pgqa-dump ((node pgqa-operator) state indent)
@@ -685,7 +702,7 @@ operator. nil indicates it's a prefix operator.")
 	    (if (and
 		 (null arg-is-operator)
 		 (> (length args) 1))
-		(pgqa-indent-operator-first-argument state indent))
+		(pgqa-indent-operator-first-argument state indent i))
 	  ;; If an "ordinary" expression follows a multi-line operator within
 	  ;; comma operator (e.g. SELECT list), break the line so that the
 	  ;; multi-line operator does not share even a single line with the
@@ -703,7 +720,7 @@ operator. nil indicates it's a prefix operator.")
 		  ;; "(" should appear on a new line, indented as the argument
 		  ;; would be if there were no parentheses. (The argument
 		  ;; itself will eventually be given extra indentation.)
-		  (pgqa-indent-operator-first-argument state indent))
+		  (pgqa-indent-operator-first-argument state indent i))
 
 	      (pgqa-deparse-string state "(" indent)
 	      ;; No space, whatever follows "(".
