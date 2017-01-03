@@ -60,7 +60,7 @@
 ;; `state' is an instance of `pgqa-deparse-state' class.
 ;;
 ;; `indent' determines indentation of the node.
-(defmethod pgqa-dump ((node pgqa-node) state indent)
+(defmethod pgqa-dump ((node pgqa-node) state indent &optional face)
   "Turn a node and its children into string."
   nil)
 
@@ -170,7 +170,8 @@ indented."
     (pgqa-deparse-space state))
   )
 
-(defmethod pgqa-deparse-string ((state pgqa-deparse-state) str indent)
+(defmethod pgqa-deparse-string ((state pgqa-deparse-state) str indent
+				&optional face)
   "Write arbitrary string to deparsing output."
 
   (pgqa-deparse-string-prepare state str indent)
@@ -182,7 +183,11 @@ indented."
        (string= str "(") (string= str "["))
       (oset state next-space 0))
 
-  (oset state result (concat (oref state result) str))
+  (let ((str-highlighted str))
+    (if (and (null noninteractive) face)
+	(add-text-properties 0 (string-width str-highlighted)
+			     '(font-lock-face pgqa-operator) str-highlighted))
+    (oset state result (concat (oref state result) str-highlighted)))
   (oset state next-column (+ (oref state next-column) (string-width str))))
 
 ;; Top-level keyword might deserve special attention, e.g. adding tabs between
@@ -451,16 +456,18 @@ indented."
 (defmethod pgqa-dump ((node pgqa-func-call) state indent)
   "Print out function call"
 
-  (pgqa-dump (oref node name) state indent)
+  ;; Here pgqa-operator stands for face, not the operator object.
+  (pgqa-dump (oref node name) state indent pgqa-operator)
+
   ;; No space between function name and the parenthesis.
   (oset state next-space 0)
-  (pgqa-deparse-string state "(" indent)
+  (pgqa-deparse-string state "(" indent pgqa-operator)
   (let ((args (oref node args)))
     (if (> (length args) 0)
 	(pgqa-dump args state indent)))
   ;; Likewise, no space after.
   (oset state next-space 0)
-  (pgqa-deparse-string state ")" indent)
+  (pgqa-deparse-string state ")" indent pgqa-operator)
 )
 
 ;; Number is currently stored as a string - should this be changed?
@@ -495,10 +502,10 @@ indented."
    )
   "Table or column reference.")
 
-(defmethod pgqa-dump ((node pgqa-obj) state indent)
+(defmethod pgqa-dump ((node pgqa-obj) state indent &optional face)
   "Turn an SQL object into a string."
   (let ((str (mapconcat 'format (oref node args) ".")))
-    (pgqa-deparse-string state str indent)))
+    (pgqa-deparse-string state str indent face)))
 
 (defclass pgqa-operator (pgqa-expr)
   (
@@ -685,7 +692,11 @@ operator. nil indicates it's a prefix operator.")
 	      (if omit-space
 	      	  (oset state next-space 0))
 
-	      (pgqa-deparse-string state op indent)))
+	      ;; Assign a face if op is a "regular operator".
+	      (let ((face))
+		(if (null (string= op ","))
+		    (setq face pgqa-operator))
+		(pgqa-deparse-string state op indent face))))
 
 	;; Ensure correct initial position for the argument output in case the
 	;; operator spans multiple lines.

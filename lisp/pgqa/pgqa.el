@@ -178,6 +178,11 @@ variables are set."
 			   "\\>\\|\\<")
 		"\\>")))
 
+(defface pgqa-operator
+  '((t :foreground "red1"))
+  "`pgqq-mode' face used to highlight SQL operators and functions."
+  :group 'pgqa)
+
 ;; TODO Make sure the funcion can also turn the mode off.
 (define-derived-mode pgqa-mode
   prog-mode
