@@ -119,6 +119,7 @@ representation.")
   (let ((indent-width (* indent tab-width)))
     (make-instance 'pgqa-deparse-state
 		   :indent indent
+		   :indent-top-expr 0
 		   :next-column (+ indent-width init-col-src)
 		   :next-space 0
 		   :line-empty t
@@ -233,7 +234,7 @@ indented."
 	(let* ((indent-top-expr (oref state indent-top-expr))
 	       (nspaces (- (* indent-top-expr tab-width) (string-width keyword))))
 
-	  ;; Anything wrong about computation of indnt-top-expr?
+	  ;; Anything wrong about computation of indent-top-expr?
 	  (if (< nspaces 1)
 	      (error "indent-top-expr is too low"))
 
@@ -314,34 +315,42 @@ indented."
 	(oset state indent-top-expr (/ max-width tab-width)))
     )
 
-  (if (string= (oref node kind) "SELECT")
-      (let ((te (oref node target-expr))
-	    (indent-clause (1+ indent)))
-	(pgqa-deparse-top-keyword state "SELECT" indent t)
+  (let ((indent-clause))
+    (if pgqa-clause-newline
+	(setq indent-clause (1+ indent))
+      ;; Extra tab might have been added in front of the clause (to ensure
+      ;; that all clauses of the query start at the same position), so all
+      ;; lines of the clause must start at that position.
+      (setq indent-clause (oref state indent-top-expr)))
 
-	;; Start on a new line if the first target entry would start at higher
-	;; column than any other one.
-	;;
-	;; TODO The same for GROUP BY / ORDER BY.
-	(if (and pgqa-multiline-operator (null pgqa-clause-newline))
-	    (pgqa-prepare-comma-dump te state indent)
-	  (if pgqa-clause-newline
-	      (pgqa-deparse-newline state indent-clause)))
+    (if (string= (oref node kind) "SELECT")
+	(let ((te (oref node target-expr)))
+	  (pgqa-deparse-top-keyword state "SELECT" indent t)
 
-	(pgqa-dump te state indent-clause)))
+	  ;; Start on a new line if the first target entry would start at
+	  ;; higher column than any other one.
+	  ;;
+	  ;; TODO The same for GROUP BY / ORDER BY.
+	  (if (and pgqa-multiline-operator (null pgqa-clause-newline))
+	      (pgqa-prepare-comma-dump te state indent)
+	    (if pgqa-clause-newline
+		(pgqa-deparse-newline state indent-clause)))
 
-  (if (string= (oref node kind) "UPDATE")
-      (let ((tt (oref node target-table))
-	    (te (oref node target-expr)))
-	(pgqa-deparse-top-keyword state "UPDATE" indent t)
-	(pgqa-dump tt state (1+ indent))
-	(pgqa-deparse-top-keyword state "SET" indent nil)
-	(pgqa-dump te state (1+ indent))))
+	  (pgqa-dump te state indent-clause)))
 
-  (if (slot-boundp node 'from-expr)
-      (let ((from-expr (oref node from-expr)))
-	;; Update may or may not have FROM clause.
-	(pgqa-dump from-expr state indent)))
+    (if (string= (oref node kind) "UPDATE")
+	(let ((tt (oref node target-table))
+	      (te (oref node target-expr)))
+	  (pgqa-deparse-top-keyword state "UPDATE" indent t)
+	  (pgqa-dump tt state indent-clause)
+	  (pgqa-deparse-top-keyword state "SET" indent nil)
+	  (pgqa-dump te state indent-clause)))
+
+    (if (slot-boundp node 'from-expr)
+	(let ((from-expr (oref node from-expr)))
+	  ;; Update may or may not have FROM clause.
+	  (pgqa-dump from-expr state indent)))
+    )
   )
 
 (defclass pgqa-from-expr (pgqa-node)
@@ -354,7 +363,13 @@ indented."
 
 (defmethod pgqa-dump ((node pgqa-from-expr) state indent)
   (let ((from-list (oref node from-list))
-	(indent-clause (1+ indent)))
+	(indent-clause))
+
+    ;; See the related comment in pgqa-dump method of pgqa-query class.
+    (if pgqa-clause-newline
+	(setq indent-clause (1+ indent))
+      (setq indent-clause (oref state indent-top-expr)))
+
     ;; INSERT, UPDATE or DELETE statement can have the list empty.
     (if (> (length from-list) 0)
 	(progn
@@ -381,7 +396,14 @@ indented."
     )
 
   (if (slot-boundp node 'qual)
-      (let ((indent-clause (1+ indent)))
+      (let ((indent-clause))
+	;; Like above. XXX Should the whole body of the function be wrapped in
+	;; an extra "let" construct, which initializes the variable only
+	;; once?)
+	(if pgqa-clause-newline
+	    (setq indent-clause (1+ indent))
+	  (setq indent-clause (oref state indent-top-expr)))
+
 	;; `space' should be up-to-date as the FROM clause is mandatory.
 	(pgqa-deparse-top-keyword state "WHERE" indent nil)
 	(if pgqa-clause-newline

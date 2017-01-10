@@ -102,4 +102,21 @@ batch mode"))
     (prepare-next-test)
     (setq tab-width 4)
     (princ "\n\n")
+    (pgqa-run-single-formatting-test)
+
+    ;; This test differs from the previous one by
+    ;; pgqa-clause-newline. (pgqa-multiline-operator is cleared too, to make
+    ;; the effect of pgqa-clause-newline visible). The test verifies that:
+    ;; 1. the top level clause receives extra indentation if the "top keyword"
+    ;; (e.g. SELECT) reaches behind the first tab position, 2. all the lines
+    ;; of the clause obey this indentation - this is why we adjust fill-column
+    ;; too.
+    (prepare-next-test)
+    (setq pgqa-multiline-query t)
+    (setq pgqa-multiline-join t)
+    (setq pgqa-join-newline t)
+    (setq pgqa-multiline-operator nil)
+    (setq pgqa-clause-newline nil)
+    (setq fill-column 20)
+    (princ "\n\n")
     (pgqa-run-single-formatting-test)))
