@@ -24,6 +24,11 @@
     (setq state (pgqa-deparse-batch))
     (princ (oref state result))))
 
+(defun prepare-next-test ()
+  (erase-buffer)
+  (insert input-text)
+  (pgqa-mode))
+
 (defun pgqa-test-formatting ()
   "Test query formatting using various values of the related custom variables."
 
@@ -42,9 +47,7 @@ batch mode"))
 
     (pgqa-run-single-formatting-test)
 
-    (erase-buffer)
-    (insert input-text)
-    (pgqa-mode)
+    (prepare-next-test)
     (setq pgqa-multiline-query t)
     (setq pgqa-multiline-join nil)
     (setq pgqa-join-newline nil)
@@ -52,10 +55,7 @@ batch mode"))
     (princ "\n\n")
     (pgqa-run-single-formatting-test)
 
-
-    (erase-buffer)
-    (insert input-text)
-    (pgqa-mode)
+    (prepare-next-test)
     (setq pgqa-multiline-query t)
     (setq pgqa-multiline-join t)
     (setq pgqa-join-newline nil)
@@ -63,9 +63,7 @@ batch mode"))
     (princ "\n\n")
     (pgqa-run-single-formatting-test)
 
-    (erase-buffer)
-    (insert input-text)
-    (pgqa-mode)
+    (prepare-next-test)
     (setq pgqa-multiline-query t)
     (setq pgqa-multiline-join t)
     (setq pgqa-join-newline t)
@@ -73,9 +71,7 @@ batch mode"))
     (princ "\n\n")
     (pgqa-run-single-formatting-test)
 
-    (erase-buffer)
-    (insert input-text)
-    (pgqa-mode)
+    (prepare-next-test)
     (setq pgqa-multiline-query t)
     (setq pgqa-multiline-join t)
     (setq pgqa-join-newline t)
@@ -84,9 +80,7 @@ batch mode"))
     (pgqa-run-single-formatting-test)
 
     ;; pgqa-clause-newline with pgqa-multiline-operator set.
-    (erase-buffer)
-    (insert input-text)
-    (pgqa-mode)
+    (prepare-next-test)
     (setq pgqa-multiline-query t)
     (setq pgqa-multiline-join t)
     (setq pgqa-join-newline t)
@@ -96,9 +90,7 @@ batch mode"))
     (pgqa-run-single-formatting-test)
 
     ;; pgqa-clause-newline with pgqa-multiline-operator not set.
-    (erase-buffer)
-    (insert input-text)
-    (pgqa-mode)
+    (prepare-next-test)
     (setq pgqa-multiline-query t)
     (setq pgqa-multiline-join t)
     (setq pgqa-join-newline t)
