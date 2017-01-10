@@ -98,6 +98,10 @@ should start.")
     :initarg :next-space
     :documentation "The width of the next space to be printed out.")
 
+   (line-empty
+    :initarg :line-empty
+    :documentation "Is the current line empty or contains only whitespace?")
+
    (result
     :initarg :result
     :documentation "String to which each node appends its textual
@@ -109,7 +113,7 @@ representation.")
 
 ;; init-col-src is column (in addition to the indentation) at which the source
 ;; query starts.
-(defun pgqa-init-deparse-state (indent init-col-src)
+(defun pgqa-init-deparse-state (indent init-col-src line-empty)
   "Initialize instance of `pgqa-deparse-state'."
 
   (let ((indent-width (* indent tab-width)))
@@ -117,6 +121,7 @@ representation.")
 		   :indent indent
 		   :next-column (+ indent-width init-col-src)
 		   :next-space 0
+		   :line-empty t
 		   :result (make-string indent-width 32))))
 
 (defmethod pgqa-deparse-newline ((state pgqa-deparse-state) indent)
@@ -133,7 +138,8 @@ indented."
     (setq result (concat result
 			 (make-string indent-width 32)))
     (oset state result result)
-    (oset state next-column indent-width))
+    (oset state next-column indent-width)
+    (oset state line-empty t))
   )
 
 (defmethod pgqa-deparse-space ((state pgqa-deparse-state))
@@ -188,7 +194,10 @@ indented."
 	(add-text-properties 0 (string-width str-highlighted)
 			     '(font-lock-face pgqa-operator) str-highlighted))
     (oset state result (concat (oref state result) str-highlighted)))
-  (oset state next-column (+ (oref state next-column) (string-width str))))
+  (oset state next-column (+ (oref state next-column) (string-width str)))
+  ;; clear line-empty if there string contains non-whitespace character.
+  (if (string-match "\\S-" str)
+      (oset state line-empty nil)))
 
 ;; Top-level keyword might deserve special attention, e.g. adding tabs between
 ;; itself and the following expression.
@@ -409,9 +418,7 @@ indented."
 
     (if (and is-join pgqa-join-newline
 	     ;; Only break the line if it hasn't just happened for any reason.
-	     (>
-	      (oref state next-column)
-	      (* (oref state indent-top-expr) tab-width)))
+	     (null (oref state line-empty)))
 	(progn
 	  (oset state next-space 0)
 	  (pgqa-deparse-newline state indent)))
@@ -620,6 +627,8 @@ operator. nil indicates it's a prefix operator.")
     ;; line.
     (if (= arg-idx 0)
 	;; Find out whether the current line contains a non-white character.
+	;;
+	;; TODO Use (oref state line-empty) instead.
 	(while (and (null done) (>= i 0))
 	  (setq last (substring s i (1+ i)))
 	  (if (string= last "\n")

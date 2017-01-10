@@ -1113,7 +1113,8 @@ in front of each line."
     (unless indent
       (setq indent 0))
 
-    (setq state (pgqa-init-deparse-state indent init-col))
+    (setq state (pgqa-init-deparse-state indent init-col
+					 (null leading-whitespace)))
 
     ;; The leading non-whitespace string replaces the indentation.
     (if (null leading-whitespace)
@@ -1135,7 +1136,7 @@ in front of each line."
 
 (defun pgqa-deparse-batch ()
   "Deparse query in batch mode"
-  (setq state (pgqa-init-deparse-state 0 0))
+  (setq state (pgqa-init-deparse-state 0 0 t))
   (pgqa-dump pgqa-query-tree state 0)
   state)
 
