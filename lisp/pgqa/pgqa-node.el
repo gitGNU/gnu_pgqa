@@ -327,14 +327,11 @@ indented."
 	(let ((te (oref node target-expr)))
 	  (pgqa-deparse-top-keyword state "SELECT" indent t)
 
-	  ;; Start on a new line if the first target entry would start at
-	  ;; higher column than any other one.
+	  ;; Enforce line break if necessary.
 	  ;;
 	  ;; TODO The same for GROUP BY / ORDER BY.
-	  (if (and pgqa-multiline-operator (null pgqa-clause-newline))
-	      (pgqa-prepare-comma-dump te state indent)
-	    (if pgqa-clause-newline
-		(pgqa-deparse-newline state indent-clause)))
+	  (if pgqa-clause-newline
+	      (pgqa-deparse-newline state indent-clause))
 
 	  (pgqa-dump te state indent-clause)))
 
@@ -570,69 +567,6 @@ operator. nil indicates it's a prefix operator.")
 	;; Comma is not a multi-line operator as such, only its arguments
 	;; are.
 	(null (string= op ",")))
-    )
-  )
-
-;; For structured output, it'd look weird if the target list started behind
-;; the expected indentation (typically because the SELECT keyword exceeds
-;; tab-width) while the operators on the following lines are indented
-;; correctly. Let's break the line so that even the first expression is
-;; indented exactly.
-;;
-;; This action is only needed if the target expression (comma) contains at
-;; least one operator that needs structured output and that operator is not
-;; the first one (else it breaks the line anyway).
-(defmethod pgqa-prepare-comma-dump ((node pgqa-operator) state indent)
-  "Prepare deparsing of comma operator."
-
-  ;; No other operator should follow SELECT, GROUP BY, ORDER BY. XXX Is comma
-  ;; worth special subclass of pgqa-operator?
-  (cl-assert (string= (oref node op) ","))
-
-  ;; This function should only be called if the multi-line dump of operators
-  ;; is expected.
-  (cl-assert pgqa-multiline-operator)
-
-  (let ((args (oref node args))
-	(i 0)
-	(match -1))
-    (if (and
-	 ;; The problem explained above can only occur if there are 2 or more
-	 ;; arguments.
-	 (> (length args) 1)
-	 ;; The actual check whether indentation of the first element is
-	 ;; excessive. (Even equality is a problem because at least one space
-	 ;; needs to be printed out in front of the first argument.)
-	 (>=
-	  (oref state next-column)
-	  (* indent-clause tab-width))
-	 ;; pgqa-clause-newline will break the line on its own, so do nothing
-	 ;; here.
-	 (null pgqa-clause-newline))
-
-	(progn
-	  ;; Find the first object to be printed out structured.
-	  (while (and (eq match -1) args)
-	    (let ((arg (car args))
-		  (op))
-	      (cl-assert(eq (eieio-object-class-name arg) 'pgqa-target-entry))
-
-	      (setq op (oref arg expr))
-	      (if (pgqa-is-multiline-operator op)
-		  (setq match i)
-		(progn
-		  (setq args (cdr args))
-		  (setq i (1+ i))))))
-
-	  ;; Only take action if non-first arg matched our criteria. In
-	  ;; contrast, if it was the first one, it'll take care of both line
-	  ;; break and indentation itself.
-	  (if (> i 0)
-	      (progn
-		(pgqa-deparse-newline state indent-clause)
-		(oset state next-space 0)))
-	  )
-      )
     )
   )
 
