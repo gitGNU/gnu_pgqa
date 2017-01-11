@@ -575,31 +575,12 @@ operator. nil indicates it's a prefix operator.")
   "Prepare position for the first argument of a multiline operator."
 
   (let* ((s (oref state result))
-	 (i (1- (length s)))
-	 (last)
-	 (done)
-	 (non-white))
-    ;; For the first argument we need to know whether we should break the
-    ;; line.
-    (if (= arg-idx 0)
-	;; Find out whether the current line contains a non-white character.
-	;;
-	;; TODO Use (oref state line-empty) instead.
-	(while (and (null done) (>= i 0))
-	  (setq last (substring s i (1+ i)))
-	  (if (string= last "\n")
-	      (setq done t)
-	    (let ((non-white-match (string-match "\\S-" last)))
-	      (if (eq non-white-match 0)
-		  (progn
-		    (setq non-white t)
-		    (setq done t)))))
-	  (setq i (1- i))))
-
+	 (i (1- (length s))))
     (if
 	;; No duplicate newline if we already have one.
-	(and pgqa-clause-newline (= arg-idx 0) (null non-white))
-	(let ((indent-extra (- indent (/ (oref state next-column) tab-width))))
+	(and pgqa-clause-newline (= arg-idx 0) (oref state line-empty))
+	(let ((indent-extra
+	       (- indent (/ (oref state next-column) tab-width))))
 	  ;; indent is for the operator, so add 1 more level for the argument.
 	  (setq indent-extra (1+ indent-extra))
 	  (oset state result
