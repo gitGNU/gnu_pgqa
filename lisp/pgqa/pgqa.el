@@ -54,6 +54,13 @@ Can only be set if `pgqa-multiline-query' variable is set."
   :type 'boolean
 )
 
+(defcustom pgqa-clause-item-newline nil
+  "If non-nil, each item of query clause starts on a new line
+
+Can only be set if `pgqa-clause-newline' variable is set."
+  :type 'boolean
+)
+
 (defcustom pgqa-multiline-operator nil
   "If non-nil, operators will be deparsed in a structured way.
 
@@ -82,7 +89,13 @@ variables are set."
   (if pgqa-clause-newline
       (if (null pgqa-multiline-query)
 	  (user-error "`pgqa-clause-newline' requires
-`pgqa-multiline-query'"))))
+`pgqa-multiline-query'")))
+
+  (if pgqa-clause-item-newline
+      (if (null pgqa-clause-newline)
+	  (user-error "`pgqa-clause-item-newline' requires
+`pgqa-clause-newline'")))
+)
 
 ;; XXX Consider defcustom instead.
 (defvar pgqa-mode-prefix-key "\C-c")

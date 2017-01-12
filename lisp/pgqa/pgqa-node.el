@@ -616,10 +616,13 @@ operator. nil indicates it's a prefix operator.")
 	     (next-space-backup)
 	     (arg-is-operator (eq (eieio-object-class arg) 'pgqa-operator))
 	     (arg-is-comma (and arg-is-operator (string= (oref arg op) ",")))
+	     (arg-is-te (eq (eieio-object-class arg) 'pgqa-target-entry))
+	     ;; FROM list entry?
+	     (arg-is-fe (eq (eieio-object-class arg) 'pgqa-from-list-entry))
 	     (arg-multiline)
 	     (indent-arg indent))
 
-	(if (eq (eieio-object-class arg) 'pgqa-target-entry)
+	(if arg-is-te
 	    (setq arg-multiline (pgqa-is-multiline-operator (oref arg expr)))
 	  (setq arg-multiline (pgqa-is-multiline-operator arg)))
 
@@ -660,16 +663,32 @@ operator. nil indicates it's a prefix operator.")
 		 (null arg-is-operator)
 		 (> (length args) 1))
 		(pgqa-indent-operator-first-argument state indent i))
-	  ;; If an "ordinary" expression follows a multi-line operator within
-	  ;; comma operator (e.g. SELECT list), break the line so that the
-	  ;; multi-line operator does not share even a single line with the
-	  ;; current argument.
-	  ;;
-	  ;; TODO Consider a custom variable to switch this behavior on / off.
-	  (if (and is-comma arg-multiline-prev (null arg-multiline))
-	      (progn
-		(pgqa-deparse-newline state indent)
-		(oset state next-space 0))))
+
+	  (if is-comma
+	      (if (or
+		   ;; If an "ordinary" expression follows a multi-line
+		   ;; operator within comma operator (e.g. SELECT list), break
+		   ;; the line so that the multi-line operator does not share
+		   ;; even a single line with the current argument.
+		   ;;
+		   ;; TODO Consider a custom variable to switch this behavior
+		   ;; on / off.
+		   (and arg-multiline-prev (null arg-multiline))
+
+		   ;; Definitely break the line if user requires each target
+		   ;; list / from list entry to begin on a new line.
+		   ;;
+		   ;; Do nothing for i = 0 because pgqa-clause-item-newline
+		   ;; requires pgqa-clause-newline to be set, which takes care
+		   ;; of the first entry. Only take action if the comma is a
+		   ;; target list of FROM list (i.e. do not affect things like
+		   ;; function argument list).
+		   (and pgqa-clause-item-newline (> i 0)
+			(or arg-is-te arg-is-fe)))
+		(progn
+		  (pgqa-deparse-newline state indent)
+		  (oset state next-space 0))))
+	  )
 
 	(if parens
 	    (progn
