@@ -59,7 +59,8 @@
 
 ;; `state' is an instance of `pgqa-deparse-state' class.
 ;;
-;; `indent' determines indentation of the node.
+;; `indent' determines indentation of the node, relative to (oref node
+;; indent).
 (defmethod pgqa-dump ((node pgqa-node) state indent &optional face)
   "Turn a node and its children into string."
   nil)
@@ -574,7 +575,11 @@ operator. nil indicates it's a prefix operator.")
 	;; No duplicate newline if we already have one.
 	(and pgqa-clause-newline (= arg-idx 0) (oref state line-empty))
 	(let ((indent-extra
-	       (- indent (/ (oref state next-column) tab-width))))
+	       (-
+		;; indent argument of the function is relative to (oref state
+		;; indent), so compute "absolute value".
+		(+ (oref state indent) indent)
+		(/ (oref state next-column) tab-width))))
 	  ;; indent is for the operator, so add 1 more level for the argument.
 	  (setq indent-extra (1+ indent-extra))
 	  (oset state result

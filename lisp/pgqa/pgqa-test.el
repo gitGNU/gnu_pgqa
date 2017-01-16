@@ -151,4 +151,10 @@ batch mode"))
 
     (setq pgqa-multiline-query t)
     (princ "\n\n")
+    (pgqa-run-single-formatting-test 2)
+
+    (setq pgqa-clause-newline t)
+    (setq pgqa-multiline-join t)
+    (setq pgqa-multiline-operator t)
+    (princ "\n\n")
     (pgqa-run-single-formatting-test 2)))

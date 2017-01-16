@@ -1123,7 +1123,10 @@ in front of each line."
     (atomic-change-group
       ;; The dump should also be in the atomic block, because of marker
       ;; changes.
-      (pgqa-dump pgqa-query-tree state indent)
+      ;;
+      ;; 0 is passed for indent, as the base indentation of the query is
+      ;; contained in (oref state indent).
+      (pgqa-dump pgqa-query-tree state 0)
 
       (delete-region start end)
 
