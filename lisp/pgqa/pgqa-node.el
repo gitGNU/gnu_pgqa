@@ -77,10 +77,7 @@
   (
    (indent
     :initarg :indent
-    ;; This is useful when the query is not printed out structured, i.e. line
-    ;; breaks are only enforced by fill-column. In this case the indentation
-    ;; passed to pgqa-dump is useless because it gets increased due to
-    ;; recursive calls.
+    ;; The indentation passed to `pgqa-dump' is relative to this.
     :documentation "Indentation level of the top level query.")
 
    (indent-top-expr
@@ -129,11 +126,8 @@ representation.")
   "Adjust deparse state so that deparsing continues at a new line, properly
 indented."
 
-  ;; No recursive increments of indentation if the query should look "flat".
-  (unless pgqa-multiline-query
-    (setq indent (oref state indent)))
-
-  (let* ((indent-width (* indent tab-width))
+  (let* ((indent-loc (+ indent (oref state indent)))
+	 (indent-width (* indent-loc tab-width))
 	 (result (oref state result)))
     (setq result (concat result "\n"))
     (setq result (concat result
@@ -214,7 +208,7 @@ indented."
     ;; one need line break.
     (if (and pgqa-multiline-query (null first))
 	(progn
-	  (pgqa-deparse-newline state indent)
+	  (pgqa-deparse-newline state 0)
 	  ;; No space in front of the keyword, even if the keyword does not
 	  ;; cause line break itself.
 	  (oset state next-space 0))

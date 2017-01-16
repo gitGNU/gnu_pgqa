@@ -17,11 +17,11 @@
 
 (require 'pgqa)
 
-(defun pgqa-run-single-formatting-test ()
+(defun pgqa-run-single-formatting-test (&optional indent)
   (let ((state))
     (pgqa-check-customizations)
     (pgqa-parse)
-    (setq state (pgqa-deparse-batch))
+    (setq state (pgqa-deparse-batch indent))
     (princ (oref state result))))
 
 (defun prepare-next-test ()
@@ -130,4 +130,19 @@ batch mode"))
     (setq pgqa-clause-newline t)
     (setq pgqa-clause-item-newline t)
     (princ "\n\n")
-    (pgqa-run-single-formatting-test)))
+    (pgqa-run-single-formatting-test)
+
+    ;; Tests of non-zero indentation.
+    (setq pgqa-multiline-query nil)
+    (setq pgqa-multiline-join nil)
+    (setq pgqa-join-newline nil)
+    (setq pgqa-multiline-operator nil)
+    (setq pgqa-clause-newline nil)
+    (setq pgqa-clause-item-newline nil)
+    (setq fill-column 78)
+    (princ "\n\n")
+    (pgqa-run-single-formatting-test 2)
+
+    (setq pgqa-multiline-query t)
+    (princ "\n\n")
+    (pgqa-run-single-formatting-test 2)))

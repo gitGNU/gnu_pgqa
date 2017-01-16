@@ -1134,9 +1134,11 @@ in front of each line."
     )
   )
 
-(defun pgqa-deparse-batch ()
+(defun pgqa-deparse-batch (&optional indent)
   "Deparse query in batch mode"
-  (setq state (pgqa-init-deparse-state 0 0 t))
+  (unless indent
+    (setq indent 0))
+  (setq state (pgqa-init-deparse-state indent 0 t))
   (pgqa-dump pgqa-query-tree state 0)
   state)
 
