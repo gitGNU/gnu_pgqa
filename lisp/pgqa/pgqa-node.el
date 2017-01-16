@@ -658,7 +658,7 @@ operator. nil indicates it's a prefix operator.")
 		 (> (length args) 1))
 		(pgqa-indent-operator-first-argument state indent i))
 
-	  (if is-comma
+	  (if (and is-comma (null arg-multiline))
 	      (if (or
 		   ;; If an "ordinary" expression follows a multi-line
 		   ;; operator within comma operator (e.g. SELECT list), break
@@ -667,7 +667,7 @@ operator. nil indicates it's a prefix operator.")
 		   ;;
 		   ;; TODO Consider a custom variable to switch this behavior
 		   ;; on / off.
-		   (and arg-multiline-prev (null arg-multiline))
+		   arg-multiline-prev
 
 		   ;; Definitely break the line if user requires each target
 		   ;; list / from list entry to begin on a new line.

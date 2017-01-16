@@ -132,6 +132,12 @@ batch mode"))
     (princ "\n\n")
     (pgqa-run-single-formatting-test)
 
+    ;; The same, with pgqa-multiline-operator set.
+    (prepare-next-test)
+    (setq pgqa-multiline-operator t)
+    (princ "\n\n")
+    (pgqa-run-single-formatting-test)
+
     ;; Tests of non-zero indentation.
     (setq pgqa-multiline-query nil)
     (setq pgqa-multiline-join nil)
