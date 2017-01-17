@@ -551,6 +551,31 @@ whichever is available."
 			      :region (pgqa-union-regions nil $1 nil $2))
 	       )
 
+	      ((select-expr from-expr group-expr)
+	       (make-instance 'pgqa-query :kind "SELECT"
+			      :target-expr (car (oref $1 args))
+			      :from-expr $2
+			      :group-expr $3
+			      :region (pgqa-union-regions nil $1 nil $3))
+	       )
+
+	      ((select-expr from-expr order-expr)
+	       (make-instance 'pgqa-query :kind "SELECT"
+			      :target-expr (car (oref $1 args))
+			      :from-expr $2
+			      :order-expr $3
+			      :region (pgqa-union-regions nil $1 nil $3))
+	       )
+
+	      ((select-expr from-expr group-expr order-expr)
+	       (make-instance 'pgqa-query :kind "SELECT"
+			      :target-expr (car (oref $1 args))
+			      :from-expr $2
+			      :group-expr $3
+			      :order-expr $4
+			      :region (pgqa-union-regions nil $1 nil $4))
+	       )
+
 	      ((update-expr update-set-expr)
 	       (make-instance 'pgqa-query :kind "UPDATE"
 			      ;; $2 should be pgqa-expr, having the targetlist
@@ -632,7 +657,7 @@ whichever is available."
 	       )
 	      )
 
-	     ;; Comma is treated like an operator with the lowest possible<
+	     ;; Comma is treated like an operator with the lowest possible
 	     ;; precedence (so that it does not enforce unnecessary braces).
 	     (target-list
 	      ((target-entry)
@@ -820,6 +845,38 @@ whichever is available."
 	       (make-instance 'pgqa-expr :args (list $2)
 			      :region (pgqa-union-regions $region1 nil
 							  $region2 nil))
+	       )
+	      )
+
+	     (group-expr
+	      ((GROUP BY sort-group-list)
+	       (progn
+		 (make-instance 'pgqa-sortgroup-expr
+				:args (list $3) ;; $3 is pgqa-operator
+				;; instance (comma).
+				:is-group t
+				:region (pgqa-union-regions
+					 $region1 nil nil $3))
+		 )
+	       )
+	      )
+
+	     (order-expr
+	      ((ORDER BY sort-group-list)
+	       (progn
+		 (make-instance 'pgqa-sortgroup-expr
+				:args (list $3) ;; $3 is pgqa-operator
+				;; instance (comma).
+				:is-group nil
+				:region (pgqa-union-regions
+					 $region1 nil nil $3))
+		 )
+	       )
+	      )
+
+	     (sort-group-list
+	      ((expr-list)
+	       $1
 	       )
 	      )
 	     )

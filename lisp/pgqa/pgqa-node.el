@@ -264,6 +264,8 @@ indented."
    (kind :initarg :kind)
    (target-expr :initarg :target-expr)
    (from-expr :initarg :from-expr)
+   (group-expr :initarg :group-expr)
+   (order-expr :initarg :order-expr)
    ;; Table subject to INSERT / UPDATE / DELETE.
    (target-table :initarg :target-table)
    )
@@ -292,6 +294,12 @@ indented."
 	      (if (slot-boundp fe 'qual)
 		  (push "WHERE" top-clauses))
 	      ))
+
+	(if (slot-boundp node 'group-expr)
+	    (push "GROUP BY" top-clauses))
+
+	(if (slot-boundp node 'group-expr)
+	    (push "ORDER BY" top-clauses))
 
 	;; Find out the maximum length.
 	(dolist (i top-clauses)
@@ -324,7 +332,7 @@ indented."
 
 	  ;; Enforce line break if necessary.
 	  ;;
-	  ;; TODO The same for GROUP BY / ORDER BY.
+	  ;; TODO The same for ORDER BY, WINDOW, LIMIT, etc.
 	  (if pgqa-clause-newline
 	      (pgqa-deparse-newline state indent-clause))
 
@@ -342,6 +350,12 @@ indented."
 	(let ((from-expr (oref node from-expr)))
 	  ;; Update may or may not have FROM clause.
 	  (pgqa-dump from-expr state indent)))
+
+    (if (slot-boundp node 'group-expr)
+	(pgqa-dump (oref node group-expr) state indent))
+
+    (if (slot-boundp node 'order-expr)
+	(pgqa-dump (oref node order-expr) state indent))
     )
   )
 
@@ -463,6 +477,40 @@ indented."
 	  (pgqa-deparse-string state (oref node alias) indent))
       )
     )
+  )
+
+(defclass pgqa-sortgroup-expr (pgqa-expr)
+  (
+   ;; t and nil mean GROUP BY and ORDER BY respectively.
+   (is-group :initarg :is-group)
+   )
+  "GROUP BY or ORDER BY expression."
+)
+
+(defmethod pgqa-dump ((node pgqa-sortgroup-expr) state indent)
+  (let* ((indent-clause)
+	 (expr-tmp)
+	 (kwd)
+	 (args (oref node args))
+	 ;; See group-expr rule in pgqa-parser.el.
+	 (comma (car args)))
+
+    (setq kwd
+	  (if (oref node is-group)
+	      "GROUP BY"
+	    "ORDER BY"))
+
+    (pgqa-deparse-top-keyword state kwd indent nil)
+
+    ;; See the related comment in pgqa-dump method of pgqa-query class.
+    (if pgqa-clause-newline
+	(setq indent-clause (1+ indent))
+      (setq indent-clause (oref state indent-top-expr)))
+
+    (if pgqa-clause-newline
+	(pgqa-deparse-newline state indent-clause))
+
+    (pgqa-dump comma state indent-clause))
   )
 
 (defclass pgqa-func-call (pgqa-node)
