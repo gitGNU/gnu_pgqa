@@ -200,8 +200,7 @@ indented."
 ;;
 ;; `first' indicates that this is the first top-level keyword of the whole
 ;; query.
-(defmethod pgqa-deparse-top-keyword ((state pgqa-deparse-state) keyword indent
-				     first)
+(defmethod pgqa-deparse-top-keyword ((state pgqa-deparse-state) keyword first)
   "Dump top-level keyword (SELECT, INSERT, FROM, WHERE, etc.)"
 
   (let ((first-offset 0))
@@ -222,7 +221,7 @@ indented."
 	      (- (oref state next-column)
 		 (* (oref state indent) tab-width))))
 
-    (pgqa-deparse-string state keyword indent)
+    (pgqa-deparse-string state keyword (oref state indent))
 
     (if (and pgqa-multiline-query (null pgqa-clause-newline))
 	;; Ensure the appropriate space in front of the following expression.
@@ -271,7 +270,10 @@ indented."
    )
   "A generic SQL query (or subquery).")
 
-(defmethod pgqa-dump ((node pgqa-query) state indent)
+;; In this subclass the function does not need the `indent' argument - the
+;; base indentation is controlled by (oref state indent). (EIEIO does not
+;; allow omitting the argument altogether.)
+(defmethod pgqa-dump ((node pgqa-query) state &optional indent)
   "Turn query into a string."
 
   ;; For mutiline output, compute the first column for expressions.
@@ -320,7 +322,7 @@ indented."
 
   (let ((indent-clause))
     (if pgqa-clause-newline
-	(setq indent-clause (1+ indent))
+	(setq indent-clause 1)
       ;; Extra tab might have been added in front of the clause (to ensure
       ;; that all clauses of the query start at the same position), so all
       ;; lines of the clause must start at that position.
@@ -328,7 +330,7 @@ indented."
 
     (if (string= (oref node kind) "SELECT")
 	(let ((te (oref node target-expr)))
-	  (pgqa-deparse-top-keyword state "SELECT" indent t)
+	  (pgqa-deparse-top-keyword state "SELECT" t)
 
 	  ;; Enforce line break if necessary.
 	  ;;
@@ -341,21 +343,21 @@ indented."
     (if (string= (oref node kind) "UPDATE")
 	(let ((tt (oref node target-table))
 	      (te (oref node target-expr)))
-	  (pgqa-deparse-top-keyword state "UPDATE" indent t)
+	  (pgqa-deparse-top-keyword state "UPDATE" t)
 	  (pgqa-dump tt state indent-clause)
-	  (pgqa-deparse-top-keyword state "SET" indent nil)
+	  (pgqa-deparse-top-keyword state "SET" nil)
 	  (pgqa-dump te state indent-clause)))
 
     (if (slot-boundp node 'from-expr)
 	(let ((from-expr (oref node from-expr)))
 	  ;; Update may or may not have FROM clause.
-	  (pgqa-dump from-expr state indent)))
+	  (pgqa-dump from-expr state 0)))
 
     (if (slot-boundp node 'group-expr)
-	(pgqa-dump (oref node group-expr) state indent))
+	(pgqa-dump (oref node group-expr) state 0))
 
     (if (slot-boundp node 'order-expr)
-	(pgqa-dump (oref node order-expr) state indent))
+	(pgqa-dump (oref node order-expr) state 0))
     )
   )
 
@@ -379,7 +381,7 @@ indented."
     ;; INSERT, UPDATE or DELETE statement can have the list empty.
     (if (> (length from-list) 0)
 	(progn
-	  (pgqa-deparse-top-keyword state "FROM" indent nil)
+	  (pgqa-deparse-top-keyword state "FROM" nil)
 	  (if pgqa-clause-newline
 	      (pgqa-deparse-newline state indent-clause))
 
@@ -411,7 +413,7 @@ indented."
 	  (setq indent-clause (oref state indent-top-expr)))
 
 	;; `space' should be up-to-date as the FROM clause is mandatory.
-	(pgqa-deparse-top-keyword state "WHERE" indent nil)
+	(pgqa-deparse-top-keyword state "WHERE" nil)
 	(if pgqa-clause-newline
 	    (pgqa-deparse-newline state indent-clause))
 	(pgqa-dump (oref node qual) state indent-clause)))
@@ -500,7 +502,7 @@ indented."
 	      "GROUP BY"
 	    "ORDER BY"))
 
-    (pgqa-deparse-top-keyword state kwd indent nil)
+    (pgqa-deparse-top-keyword state kwd nil)
 
     ;; See the related comment in pgqa-dump method of pgqa-query class.
     (if pgqa-clause-newline
