@@ -426,8 +426,9 @@ indented."
 ;; (both need the alias).
 (defclass pgqa-from-list-entry (pgqa-expr)
   (
+   ;; Instance of pgqa-from-list-entry-alias.
    (alias :initarg :alias)
-   ;; For a simple entry, the value is one of "table", "function", "subquery",
+   ;; For a simple entry, the value is one of "table", "function", "query",
    ;; "values". For join it's "left", "rignt", "full" (nil implies inner join
    ;; as long as 'args has 2 elements).
    (kind :initarg :kind)
@@ -443,7 +444,9 @@ indented."
 
   (let* ((args (oref node args))
 	 (nargs (length args))
-	 (is-join (= nargs 2)))
+	 (is-join (= nargs 2))
+	 (arg (car args))
+	 (arg-is-query (eq (eieio-object-class arg) 'pgqa-query)))
     (cl-assert (or (= nargs 1) (= nargs 2)))
 
     (if (and is-join pgqa-join-newline
@@ -453,7 +456,9 @@ indented."
 	  (oset state next-space 0)
 	  (pgqa-deparse-newline state indent)))
 
-    (pgqa-dump (car args) state indent)
+    (if (null arg-is-query)
+	(pgqa-dump arg state indent)
+      (pgqa-dump-from-list-query arg state indent))
 
     (if is-join
 	(progn
@@ -467,19 +472,56 @@ indented."
 	      (pgqa-deparse-string state (upcase kind) indent)))
 	  (pgqa-deparse-string state "JOIN" indent)
 
-	  (pgqa-dump (nth 1 args) state indent)
+	  (setq arg (nth 1 args))
+	  (pgqa-dump arg state indent)
 
 	  (pgqa-deparse-string state "ON" indent)
 
 	  (pgqa-dump (oref node qual) state (1+ indent))))
 
     (if (slot-boundp node 'alias)
-	(progn
-	  (pgqa-deparse-string state "AS" indent)
-	  (pgqa-deparse-string state (oref node alias) indent))
-      )
+	(pgqa-dump (oref node alias) state indent))
     )
   )
+
+;; Query in the FROM list is not a typical from-list-entry.
+;;
+;; TODO Consider custom variable that controls whether parentheses are on the
+;; same lines the query starts and ends respectively.
+(defun pgqa-dump-from-list-query (query state indent)
+  ;; XXX Can we do anything batter than breaking the line if either or
+  ;; pgqa-join-newline or pgqa-multiline-join (or both) are nil?
+  (if (null (oref state line-empty))
+      (progn
+	(oset state next-space 0)
+	(pgqa-deparse-newline state indent)))
+
+  ;; Use a separate state to print out query.
+  (let ((state-loc
+	 (pgqa-init-deparse-state
+	  (+ (oref state indent) indent)
+	  ;; init-col-src of 1 stands for the opening parenthesis.
+	  1 t)))
+    (pgqa-deparse-string state "(" indent)
+    (oset state-loc result (oref state result))
+    (pgqa-dump query state-loc 0)
+    (oset state result (oref state-loc result))
+    (oset state next-space 0)
+    (pgqa-deparse-string state ")" indent)))
+
+;; TODO Store argument list to :args if the alias has some.
+(defclass pgqa-from-list-entry-alias (pgqa-expr)
+  (
+   (name :initarg :name)
+   )
+  "From list entry alias."
+)
+
+(defmethod pgqa-dump ((node pgqa-from-list-entry-alias) state indent
+		      &optional face)
+  "Turn alias into a string."
+  (pgqa-deparse-string state "AS" indent)
+  (pgqa-deparse-string state (oref node name) indent))
 
 (defclass pgqa-sortgroup-expr (pgqa-expr)
   (
@@ -595,11 +637,14 @@ operator. nil indicates it's a prefix operator.")
 ;; sublink. Should they be given certain precedence just because of this?
 (defun pgqa-child-needs-parens (node arg)
   "Find out if argument of an operator node should be parenthesized."
-  (let ((prec (oref node prec))
-	(prec-child
-	 (if (object-of-class-p arg pgqa-operator)
-	     (oref arg prec))))
-    (and prec prec-child (> prec prec-child)))
+  (if (eq (eieio-object-class node) 'pgqa-query)
+      ;; Query as an argument should always be parenthesized.
+      t
+    (let ((prec (oref node prec))
+	  (prec-child
+	   (if (object-of-class-p arg pgqa-operator)
+	       (oref arg prec))))
+      (and prec prec-child (> prec prec-child))))
   )
 
 (defun pgqa-is-multiline-operator (node)

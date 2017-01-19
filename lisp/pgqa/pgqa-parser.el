@@ -780,20 +780,16 @@ whichever is available."
 	       )
 
 	      ((sql-object)
-	       (make-instance 'pgqa-from-list-entry :args (list $1)
+	       (make-instance 'pgqa-from-list-entry :kind "table"
+			      :args (list $1)
 			      :region (pgqa-get-nonterm-region $region1 $1))
 	       )
 
-	      ((sql-object SYMBOL)
-	       (make-instance 'pgqa-from-list-entry :args (list $1) :alias $2
+	      ((sql-object from-list-entry-alias)
+	       (make-instance 'pgqa-from-list-entry :kind "table"
+			      :args (list $1) :alias $2
 			      :region (pgqa-union-regions $region1 $1
 							  $region2 $2))
-	       )
-
-	      ((sql-object AS SYMBOL)
-	       (make-instance 'pgqa-from-list-entry :args (list $1) :alias $3
-			      :region (pgqa-union-regions $region1 $1
-							  $region3 $3))
 	       )
 
 	      ;; Separate rules exist for a function in the FROM list. At
@@ -809,13 +805,10 @@ whichever is available."
 	       (let* ((reg-fc (pgqa-union-regions $region1 $1 $region4 $4))
 		      (fc (make-instance 'pgqa-func-call :name $1 :args $3
 					 :region reg-fc))
-		      (alias-expr $5)
-		      ;; args slot of alias-expr contains a list whose only
-		      ;; element is the alias symbol (string) - see
-		      ;; from-list-entry-alias.
-		      (alias (car (oref alias-expr args))))
-		 (make-instance 'pgqa-from-list-entry :args (list fc)
-				:alias alias
+		      (alias-expr $5))
+		 (make-instance 'pgqa-from-list-entry :kind "function"
+				:args (list fc)
+				:alias alias-expr
 				:region (pgqa-union-regions nil fc nil
 							    alias-expr)))
 	       )
@@ -823,26 +816,33 @@ whichever is available."
 	      ((sql-object ?( ?) from-list-entry-alias)
 	       (let* ((reg-fc (pgqa-union-regions $region1 $1 $region3 $3))
 		      (fc (make-instance 'pgqa-func-call :name $1 :args nil
-					  :region reg-fc))
-		      (alias-expr $4)
-		      (alias (car (oref alias-expr args))))
-		 (make-instance 'pgqa-from-list-entry :args (list fc)
-				:alias alias
-				:region (pgqa-union-regions nil fc nil
-							    alias-expr)))
+					 :region reg-fc)))
+		 (make-instance 'pgqa-from-list-entry :kind "function"
+				:args (list fc)
+				:alias $4
+				:region (pgqa-union-regions nil fc nil $4)))
+	       )
+
+	      ((?( query ?) from-list-entry-alias)
+	       (make-instance 'pgqa-from-list-entry :kind "query"
+			      :args (list $2)
+			      :alias $4
+			      :region (pgqa-union-regions $region1 nil
+							  nil $4))
 	       )
 	      )
 
 	     ;; Alias of a function in the FROM list or that of a subquery.
 	     (from-list-entry-alias
 	      ((SYMBOL)
-	       ;; Use generic expression, to transfer region info.
-	       (make-instance 'pgqa-expr :args (list $1)
+	       (make-instance 'pgqa-from-list-entry-alias
+			      :name $1
 			      :region (pgqa-get-nonterm-region $region1 nil))
 	       )
 
 	      ((AS SYMBOL)
-	       (make-instance 'pgqa-expr :args (list $2)
+	       (make-instance 'pgqa-from-list-entry-alias
+			      :name $2
 			      :region (pgqa-union-regions $region1 nil
 							  $region2 nil))
 	       )
