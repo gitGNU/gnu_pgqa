@@ -850,27 +850,23 @@ whichever is available."
 
 	     (group-expr
 	      ((GROUP BY sort-group-list)
-	       (progn
-		 (make-instance 'pgqa-sortgroup-expr
-				:args (list $3) ;; $3 is pgqa-operator
-				;; instance (comma).
-				:is-group t
-				:region (pgqa-union-regions
-					 $region1 nil nil $3))
-		 )
+	       (make-instance 'pgqa-sortgroup-expr
+			      :args (list $3) ;; $3 is pgqa-operator instance
+			      ;; (comma).
+			      :is-group t
+			      :region (pgqa-union-regions
+				       $region1 nil nil $3))
 	       )
 	      )
 
 	     (order-expr
 	      ((ORDER BY sort-group-list)
-	       (progn
-		 (make-instance 'pgqa-sortgroup-expr
-				:args (list $3) ;; $3 is pgqa-operator
-				;; instance (comma).
-				:is-group nil
-				:region (pgqa-union-regions
-					 $region1 nil nil $3))
-		 )
+	       (make-instance 'pgqa-sortgroup-expr
+			      :args (list $3) ;; $3 is pgqa-operator instance
+			      ;; (comma).
+			      :is-group nil
+			      :region (pgqa-union-regions
+				       $region1 nil nil $3))
 	       )
 	      )
 
