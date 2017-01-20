@@ -69,8 +69,7 @@ WHERE
                         )
         AND
                 (
-                                                i.last_task_finished
-                                        ISNULL
+                                                i.last_task_finished ISNULL
                                 OR
                                                 i.last_task_finished
                                         <
@@ -127,8 +126,7 @@ WHERE
                         )
         AND
                 (
-                                                i.last_task_finished
-                                        ISNULL
+                                                i.last_task_finished ISNULL
                                 OR
                                                 i.last_task_finished
                                         <
@@ -262,8 +260,7 @@ WHERE
                         )
         AND
                 (
-                                                i.last_task_finished
-                                        ISNULL
+                                                i.last_task_finished ISNULL
                                 OR
                                                 i.last_task_finished
                                         <
