@@ -85,12 +85,16 @@ characters."
 ;; that it's easy to reload custom operators from PG.
 (defvar pgqa-terminal-hash nil)
 
-;; Special values of precedence or those referenced multiple times throughout
-;; the code.
-(defconst pgqa-precedence-comma -1)
-(defconst pgqa-precedence-plus 4)
-(defconst pgqa-precedence-times 5)
-(defconst pgqa-precedence-uminus 6)
+;; Precedence constants. Do not use the numbers directly.
+(defconst pgqa-precedence-uminus	7)
+(defconst pgqa-precedence-times		6)
+(defconst pgqa-precedence-add		5)
+(defconst pgqa-precedence-cmp		4)
+(defconst pgqa-precedence-test		3)
+(defconst pgqa-precedence-not		2)
+(defconst pgqa-precedence-and		1)
+(defconst pgqa-precedence-or		0)
+(defconst pgqa-precedence-comma		-1)
 
 ;; As the grammar definition does not accept terminals in the form of string,
 ;; a symbol must exist to represent each terminal. We can't use hard-wired
@@ -109,19 +113,19 @@ characters."
   '(OPGROUP-1 pgqa-precedence-times "/"))
 
 (defvar pgqa-operator-group-2
-  '(OPGROUP-2 4 ">" "<" "=" "<=" ">=" "<>"))
+  '(OPGROUP-2 pgqa-precedence-cmp ">" "<" "=" "<=" ">=" "<>"))
 
 (defvar pgqa-operator-group-3
-  '(OPGROUP-3 3 "IS" "ISNULL" "NOTNULL"))
+  '(OPGROUP-3 pgqa-precedence-test "IS" "ISNULL" "NOTNULL"))
 
 (defvar pgqa-operator-group-4
-  '(OPGROUP-4 2 "NOT"))
+  '(OPGROUP-4 pgqa-precedence-not "NOT"))
 
 (defvar pgqa-operator-group-5
-  '(OPGROUP-5 1 "AND"))
+  '(OPGROUP-5 pgqa-precedence-and "AND"))
 
 (defvar pgqa-operator-group-6
-  '(OPGROUP-6 0 "OR"))
+  '(OPGROUP-6 pgqa-precedence-or "OR"))
 
 (defvar pgqa-operator-groups
   (list pgqa-operator-group-1 pgqa-operator-group-2 pgqa-operator-group-3
@@ -408,9 +412,9 @@ whichever is available."
 
     ;; + and - can be used as unary operators, so they don't fit our concept of
     ;; groups. Create the rules separate.
-    (push (pgqa-create-binop-expr-rule "+" ?+ pgqa-precedence-plus)
+    (push (pgqa-create-binop-expr-rule "+" ?+ pgqa-precedence-add)
 	  rule-sublist-1)
-    (push (pgqa-create-binop-expr-rule "-" ?- pgqa-precedence-plus)
+    (push (pgqa-create-binop-expr-rule "-" ?- pgqa-precedence-add)
 	  rule-sublist-1)
 
     (setq rule-sublist-1
