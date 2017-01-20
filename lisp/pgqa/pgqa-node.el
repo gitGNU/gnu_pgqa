@@ -757,17 +757,18 @@ operator. nil indicates it's a prefix operator.")
 	(if multiline
 	    ;; If the arg is also an operator, it'll take care of the newline
 	    ;; (and correct indentation) itself. Otherwise we need to break
-	    ;; the line explicitly.
+	    ;; the line and indent explicitly.
 	    ;;
-	    ;; Unary operator is an exception - it looks better if both
-	    ;; operator and argument end up on the same line. Again, if the
-	    ;; argument of the unary operator is operator itself (which
-	    ;; includes parentheses), it'll take care of the line breaks
-	    ;; automatically.
+	    ;; An exception is if the current operator (i.e. not the argument)
+	    ;; is unary prefix - it looks better if both operator and argument
+	    ;; end up on the same line. Again, if the argument of the unary
+	    ;; operator is operator itself (which includes parentheses), it'll
+	    ;; take care of the line breaks automatically.
 	    (if (and
 		 (null arg-is-operator)
-		 (> (length args) 1))
-		(pgqa-indent-operator-first-argument state indent i))
+		 (or (> (length args) 1) (oref node postfix)))
+		(pgqa-indent-operator-first-argument state indent i)
+	      )
 
 	  (if (and is-comma (null arg-multiline))
 	      (if (or
