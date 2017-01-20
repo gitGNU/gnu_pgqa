@@ -78,7 +78,8 @@
   (
    (indent
     :initarg :indent
-    ;; The indentation passed to `pgqa-dump' is relative to this.
+    ;; The indentation passed to `pgqa-dump', `pgqa-deparse-string' and
+    ;; subroutines is relative to this.
     :documentation "Indentation level of the top level query.")
 
    (indent-top-expr
@@ -221,7 +222,8 @@ indented."
 	      (- (oref state next-column)
 		 (* (oref state indent) tab-width))))
 
-    (pgqa-deparse-string state keyword (oref state indent))
+    (pgqa-deparse-string state keyword
+			 (if pgqa-multiline-query 1 0))
 
     (if (and pgqa-multiline-query (null pgqa-clause-newline))
 	;; Ensure the appropriate space in front of the following expression.
@@ -477,7 +479,8 @@ indented."
 
 	  (pgqa-deparse-string state "ON" indent)
 
-	  (pgqa-dump (oref node qual) state (1+ indent))))
+	  (pgqa-dump (oref node qual) state
+		     (if pgqa-multiline-query (1+ indent) indent))))
 
     (if (slot-boundp node 'alias)
 	(pgqa-dump (oref node alias) state indent))
@@ -491,23 +494,31 @@ indented."
 (defun pgqa-dump-from-list-query (query state indent)
   ;; XXX Can we do anything batter than breaking the line if either or
   ;; pgqa-join-newline or pgqa-multiline-join (or both) are nil?
-  (if (null (oref state line-empty))
+  (if (and (null (oref state line-empty)) pgqa-multiline-query)
       (progn
 	(oset state next-space 0)
 	(pgqa-deparse-newline state indent)))
 
-  ;; Use a separate state to print out query.
-  (let ((state-loc
-	 (pgqa-init-deparse-state
-	  (+ (oref state indent) indent)
-	  ;; init-col-src of 1 stands for the opening parenthesis.
-	  1 t)))
-    (pgqa-deparse-string state "(" indent)
-    (oset state-loc result (oref state result))
+  (pgqa-deparse-string state "(" indent)
+
+
+  (let ((state-loc state))
+    (if pgqa-multiline-query
+	;; Use a separate state to print out query.
+	;;
+	;; init-col-src of 1 stands for the opening parenthesis.
+	(progn
+	  (setq state-loc (pgqa-init-deparse-state
+			   (+ (oref state indent) indent) 1 t))
+	  (oset state-loc next-column (oref state next-column))
+	  (oset state-loc result (oref state result))))
+
     (pgqa-dump query state-loc 0)
-    (oset state result (oref state-loc result))
-    (oset state next-space 0)
-    (pgqa-deparse-string state ")" indent)))
+    (oset state result (oref state-loc result)))
+
+  (oset state next-space 0)
+  (pgqa-deparse-string state ")" indent)
+)
 
 ;; TODO Store argument list to :args if the alias has some.
 (defclass pgqa-from-list-entry-alias (pgqa-expr)
