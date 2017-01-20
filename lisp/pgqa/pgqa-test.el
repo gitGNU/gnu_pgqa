@@ -79,7 +79,7 @@ batch mode"))
     (princ "\n\n")
     (pgqa-run-single-formatting-test)
 
-    ;; pgqa-clause-newline with pgqa-multiline-operator set.
+    ;; pgqa-clause-newline with pgqa-multiline-operator not set.
     (prepare-next-test)
     (setq pgqa-multiline-query t)
     (setq pgqa-multiline-join t)
@@ -89,7 +89,7 @@ batch mode"))
     (princ "\n\n")
     (pgqa-run-single-formatting-test)
 
-    ;; pgqa-clause-newline with pgqa-multiline-operator not set.
+    ;; pgqa-clause-newline with pgqa-multiline-operator set.
     (prepare-next-test)
     (setq pgqa-multiline-query t)
     (setq pgqa-multiline-join t)
