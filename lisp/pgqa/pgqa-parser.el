@@ -1001,6 +1001,11 @@ whichever is available."
 ;; Move point to the symbol that caused the error.
 (defun pgqa-parse-message (msg &rest args)
   (let ((positions (nth 2 wisent-input)))
+    (if (= (length wisent-input) 1)
+	(if (eq (car wisent-input) wisent-eoi-term)
+	    (user-error "Unexpected end of input")
+	  ;; This should not happen.
+	  (error "Unrecognized parser state")))
     (goto-char (elt positions 0))
     (setq pgqa-parse-error t)
     ;; Remove the (generated) operator symbols with the appropriate strings.
