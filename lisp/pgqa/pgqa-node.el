@@ -124,6 +124,20 @@ representation.")
 		   :line-empty t
 		   :result (make-string indent-width 32))))
 
+(defmethod pgqa-deparse-state-get-attrs ((state pgqa-deparse-state))
+  "Return the slots of `pgqa-deparse-state' as an association list."
+  (let ((result)
+	(item))
+    (dolist (key (object-slots state) result)
+      (setq item (list key (slot-value state key)))
+      (push item result))))
+
+(defmethod pgqa-deparse-state-set-attrs ((state pgqa-deparse-state) slots)
+  "Set slots of `pgqa-deparse-state' to values extracted by
+`pgqa-deparse-state-get-attrs'."
+  (dolist (slot slots)
+    (set-slot-value state (car slot) (car (cdr slot)))))
+
 (defmethod pgqa-deparse-newline ((state pgqa-deparse-state) indent)
   "Adjust deparse state so that deparsing continues at a new line, properly
 indented."
@@ -716,9 +730,7 @@ operator. nil indicates it's a prefix operator.")
 
     (dolist (arg args)
       (let* ((parens (pgqa-child-needs-parens node arg))
-	     (result-backup)
-	     (next-column-backup)
-	     (next-space-backup)
+	     (state-backup)
 	     (arg-is-operator (eq (eieio-object-class arg) 'pgqa-operator))
 	     (arg-is-comma (and arg-is-operator (string= (oref arg op) ",")))
 	     (arg-is-te (eq (eieio-object-class arg) 'pgqa-target-entry))
@@ -810,13 +822,10 @@ operator. nil indicates it's a prefix operator.")
 
 	;; Comma needs special treatment because it doesn't look nice if it's
 	;; the first character on a line.
-	;;(if is-comma
-	;; TODO Methods to backup / restore the state as a whole.
-	(progn
-	  (setq result-backup (oref state result))
-	  (setq next-column-backup (oref state next-column))
-	  (setq next-space-backup (oref state next-space)))
-	;;)
+	;;
+	;; Backup the slots but keep the instance so that callers still see
+	;; our changes.
+	(setq state-backup (pgqa-deparse-state-get-attrs state))
 
 	;; Serialize the argument now, giving it additional indentation if
 	;; user wants the output structured.
@@ -831,19 +840,16 @@ operator. nil indicates it's a prefix operator.")
 	  (pgqa-dump arg state indent-arg))
 
 	(if
-	    ;; If the argument should be followed by comma, line should have
+	    ;; If the argument has reached fill-column, line should have
 	    ;; broken in front of the argument. So restore the previous state
 	    ;; and dump the argument again, with fill-column temporarily
 	    ;; decreased by one. That should make the argument appear on the
 	    ;; new line too.
 	    (and
-	     ;;(string= op ",")
 	     (>= (oref state next-column) fill-column)
 	     (< i (1- nargs)))
 	    (progn
-	      (oset state result result-backup)
-	      (oset state next-column next-column-backup)
-	      (oset state next-space next-space-backup)
+	      (pgqa-deparse-state-set-attrs state state-backup)
 
 	      ;; TODO Loop until the line is broken correctly, but don't let
 	      ;; fill-column reach value that lets little or no space on the
