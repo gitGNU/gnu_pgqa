@@ -149,7 +149,8 @@ characters."
 	      :op op :args '(list $1 $3)
 	      :prec prec
 	      :region '(pgqa-union-regions $region1 $1
-					   $region3 $3)))
+					   $region3 $3)
+	      :op-node '(pgqa-node :region (car $region2))))
   (list pattern action))
 
 ;; Create gramar rule for unary prefix operator.
@@ -170,7 +171,8 @@ characters."
 	      :op op :args '(list $2)
 	      :prec prec
 	      :region '(pgqa-union-regions $region1 $1
-					   $region2 $2)))
+					   $region2 $2)
+	      :op-node '(pgqa-node :region (car $region1))))
   (if prec-nonterm
       (list pattern prec-nonterm action)
     (list pattern action)))
@@ -187,7 +189,8 @@ characters."
 	      :prec prec
 	      :postfix t
 	      :region '(pgqa-union-regions $region1 $1
-					   $region2 $2)))
+					   $region2 $2)
+	      :op-node '(pgqa-node :region (car $region2))))
   (list pattern action))
 
 ;; Create rules for given operator group and add them to the list which is
@@ -693,12 +696,16 @@ whichever is available."
 			      :region (pgqa-get-nonterm-region $region1 $1))
 	       )
 
+	      ;; TODO Use pgqa-alias and adjust both pgqa-dump and
+	      ;; pgqa-node-walk.
 	      ((expr SYMBOL)
 	       (make-instance 'pgqa-target-entry :expr $1 :alias $2
 			      :region (pgqa-union-regions $region1 $1
 							  $region2 $2))
 	       )
 
+	      ;; TODO Use pgqa-alias and adjust both pgqa-dump and
+	      ;; pgqa-node-walk.
 	      ((expr AS SYMBOL)
 	       (make-instance 'pgqa-target-entry :expr $1 :alias $3
 			      :region (pgqa-union-regions $region1 $1
@@ -1020,25 +1027,28 @@ whichever is available."
     (user-error msg))
 )
 
-;; TODO Documentation string.
-;;
-;; TODO If pgqa-query-tree already exists, make sure its markers can be
-;; garbage collected (even if the tree should be pushed to stack?).
-;;
 ;; TODO Consider declaring and handling the parameters like fill-paragraph
 ;; does (especially with REGION).
-(defun pgqa-parse ()
+(defun pgqa-parse (&optional text-only)
   "Parse the SQL query contained in the buffer and bind result to \
 `pgqa-query-tree' variable. If the variable already contained another tree, \
 it's replaced."
   (interactive)
 
+  ;; While pgqa-deparse (callled via pgqa-pgqa-format query) may be useful
+  ;; outside the pgqa major mode, parsing alone is not. For example, it'd
+  ;; result in incomplete syntax highlighting or setup of markers / overlays
+  ;; for which the related functionality might not be available (user would
+  ;; miss at least key bindings, availability of other functionality should be
+  ;; investigated). XXX Consider if pgqa minor mode would help here.
   (if (and (not noninteractive) (not (equal major-mode 'pgqa-mode)))
       (user-error "Only contents of query buffer can be parsed."))
 
-  (pgqa-parse-common))
+  (pgqa-parse-common text-only))
 
-(defun pgqa-parse-common ()
+;; text-only tells that no markers, overlays, faces, etc. should be added to
+;; the query.
+(defun pgqa-parse-common (&optional text-only)
   "Parsing functionality used for both interactive and batch mode."
   (setq pgqa-parse-error nil)
 
@@ -1069,15 +1079,23 @@ it's replaced."
 	(wisent-parse pgqa-automaton 'get-next-query-token
 		      'pgqa-parse-message 'input))
 
-  ;; Only update the existing tree if the parsing did complete.
+  ;; Only update the existing tree if parsing did complete.
   (if (null pgqa-parse-error)
+      ;; TODO Reconsider placing of the atomic-change-group form so they are
+      ;; not nested.
+      ;;
+      ;;(atomic-change-group
       (progn
-	(if (null noninteractive)
-	    (pgqa-set-markers result))
+	(if (null text-only)
+	    (progn
+	      (pgqa-delete-query-gui)
+	      (pgqa-setup-query-gui result)
+
+	      (pgqa-reset-query-faces result)
+	      (pgqa-set-query-faces result)))
 	(setq pgqa-query-tree result)))
   )
 
-;; TODO Update markers during deparsing. (Should pgqa-set-markers take care?)
 (defun pgqa-deparse (&optional indent)
   "Turn the tree stored in buffer-local variable `pgqa-query-tree' into text
 and replace contents of the owning buffer with it.
@@ -1094,21 +1112,32 @@ in front of each line."
       (error "tab-width should not be nil"))
 
   (let* ((state)
-	 (markers (oref pgqa-query-tree markers))
-	 (start (elt markers 0))
-	 (end (elt markers 1))
+	 ;; Get the start and end position from region, markers are not
+	 ;; guaranteed to exist at the moment.
+	 (region (oref pgqa-query-tree region))
+	 (start (elt region 0))
+	 (end (elt region 1))
+
 	 (init-col)
 	 (init-str)
 	 (leading-whitespace nil)
-	 (indent-estimate 0))
+	 (indent-estimate 0)
+	 ;; Add markers, overlays and faces only to buffers in the pgqa mode
+	 ;; and only if Emacs runs interactively.
+	 (text-only (or (null (equal major-mode 'pgqa-mode)) noninteractive))
+	 (query-start))
+
+    ;; Markers and overlays can exist if user called pgqa-parse and
+    ;; pgqa-deparse individually.
+    (pgqa-delete-query-gui)
 
     (save-excursion
       (goto-char start)
       (beginning-of-line)
       (setq init-col (- start (point)))
-      (let ((line-start (point))
-	    (query-start (+ (point) init-col)))
+      (let ((line-start (point)))
 
+	(setq query-start (+ (point) init-col))
 	(setq init-str (buffer-substring line-start query-start))
 	(setq init-str-width (string-width init-str))
 
@@ -1176,7 +1205,11 @@ in front of each line."
       (setq indent 0))
 
     (setq state (pgqa-init-deparse-state indent init-col
-					 (null leading-whitespace)))
+					 (null leading-whitespace)
+					 ;; nil value of :buffer-pos indicates
+					 ;; that regions should not be set
+					 ;; during deparsing.
+					 (if text-only nil query-start)))
 
     ;; The leading non-whitespace string replaces the indentation.
     (if (null leading-whitespace)
@@ -1194,7 +1227,20 @@ in front of each line."
 
       (save-excursion
 	(goto-char start)
-	(insert (oref state result)))
+	(insert (oref state result))
+
+	(if (null text-only)
+	    (progn
+	      ;; Add markers and overlays. (Deletion performed unconditionally
+	      ;; above as we have no information if the existing buffer
+	      ;; contents contained those objects.)
+	      (pgqa-setup-query-gui pgqa-query-tree)
+
+	      ;; Add faces. (Cleanup not needed -- the query string was
+	      ;; created from scratch.)
+	      (pgqa-set-query-faces pgqa-query-tree))
+	  )
+	)
       (pgqa-mode))
     )
   )
@@ -1203,7 +1249,7 @@ in front of each line."
   "Deparse query in batch mode"
   (unless indent
     (setq indent 0))
-  (setq state (pgqa-init-deparse-state indent 0 t))
+  (setq state (pgqa-init-deparse-state indent 0 t nil))
   (pgqa-dump pgqa-query-tree state 0)
   state)
 

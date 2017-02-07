@@ -97,6 +97,44 @@ variables are set."
 `pgqa-clause-newline'")))
 )
 
+;; Markers and overlays let user interact with the query, so we refer to them
+;; as GUI.
+(defvar-local pgqa-query-markers nil
+  "List of markers located within the current query.")
+
+(defvar-local pgqa-query-overlays nil
+  "List of overlays applied to the current query.")
+
+(defun pgqa-setup-query-gui (query)
+  "Add markers and overlays to query nodes."
+  (pgqa-node-walk query 'pgqa-setup-node-gui nil))
+
+(defun pgqa-delete-query-gui ()
+  "Delete overlays and make markers available for garbage collection."
+
+  (if pgqa-query-overlays
+      (progn
+	(dolist (o pgqa-query-overlays)
+	  (delete-overlay o))
+	(setq pgqa-query-overlays nil))
+      )
+
+  (if pgqa-query-markers
+      (progn
+	(dolist (m pgqa-query-markers)
+	  (set-marker m nil))
+	(setq pgqa-query-markers nil))
+      )
+    )
+
+(defun pgqa-set-query-faces (query)
+  "Add faces to query nodes."
+  (pgqa-node-walk query 'pgqa-set-node-face nil))
+
+(defun pgqa-reset-query-faces (query)
+  "Remove previously added faces from query nodes."
+  (pgqa-node-walk query 'pgqa-reset-node-face nil))
+
 ;; XXX Consider defcustom instead.
 (defvar pgqa-mode-prefix-key "\C-c")
 
@@ -191,7 +229,10 @@ variables are set."
 			   "\\>\\|\\<")
 		"\\>")))
 
-(defface pgqa-operator
+;; We add the -face suffix although the Elisp reference does not recommend
+;; so. Without the prefix we'd end up with name conflicts between faces and
+;; EIEIO classes.
+(defface pgqa-operator-face
   '((t :foreground "red1"))
   "`pgqq-mode' face used to highlight SQL operators and functions."
   :group 'pgqa)
@@ -465,7 +506,8 @@ from first position of the query."
  ;; wasting effort on parsing.
  (pgqa-check-customizations)
 
- (pgqa-parse)
+ ;; Don't set markers during parsing.
+ (pgqa-parse t)
  (pgqa-deparse indent))
 
 (defun pgqa-format-query-batch ()
@@ -480,7 +522,8 @@ batch mode"))
 
   (let ((state))
     (pgqa-check-customizations)
-    (pgqa-parse)
+    ;; Do not create markers.
+    (pgqa-parse t)
     (setq state (pgqa-deparse-batch))
     (princ (oref state result))))
 

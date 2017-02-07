@@ -38,14 +38,16 @@
    )
   "A node representing an operation on one or multiple arguments.")
 
-;; TODO Recursion.
-(defmethod pgqa-set-markers ((node pgqa-node))
-  "Turn `region' into a marker and recurse into children."
+;; Besides attaching the markers and overlays to nodes, add them to
+;; pgqa-query-markers and pgqa-query-overlays lists, for easy cleanup.
+(defun pgqa-setup-node-gui (node context)
+  "Turn region(s) into a markers and add overlay(s) to the node."
   (let* ((reg-vec (oref node region))
 	 (reg-start (elt reg-vec 0))
 	 (reg-end (elt reg-vec 1))
 	 (m-start (make-marker))
-	 (m-end (make-marker)))
+	 (m-end (make-marker))
+	 (o))
     (set-marker m-start reg-start)
     (set-marker m-end reg-end)
 
@@ -54,16 +56,94 @@
     (set-marker-insertion-type m-start t)
     (set-marker-insertion-type m-end nil)
 
+    ;; Create an overlay and make it point at the node.
+    (setq o (make-overlay m-start m-end))
+    (overlay-put o 'node node)
+
+    ;; Keep track of both markers and overlay.
+    (push m-start pgqa-query-markers)
+    (push m-end pgqa-query-markers)
+    (push o pgqa-query-overlays)
+
     (oset node markers (vector m-start m-end)))
+  )
+
+;; For performance reasons (see the Overlays section of Elisp documentation)
+;; we assign the face as text property, although cleanup would be simpler if
+;; we assigned the face via overlay.
+(defun pgqa-set-node-face (node context)
+  (if (eq (eieio-object-class node) 'pgqa-operator)
+      (let ((op-node (oref node op-node)))
+	(if op-node
+	    (let* ((m (oref op-node markers))
+		   (m-start (elt m 0))
+		   (m-end (elt m 1)))
+	      (put-text-property m-start m-end
+				 'font-lock-face 'pgqa-operator-face))
+	  )
+	)
+    )
+  )
+
+;; Remove the face added previously by pgqa-set-node-face.
+(defun pgqa-reset-node-face (node context)
+  (if (eq (eieio-object-class node) 'pgqa-operator)
+      (let ((op-node (oref node op-node)))
+	(if op-node
+	    (let* ((m (oref op-node markers))
+		   (m-start (elt m 0))
+		   (m-end (elt m 1)))
+	      (remove-text-properties m-start m-end
+				 '(font-lock-face nil)))
+	  )
+	)
+    )
   )
 
 ;; `state' is an instance of `pgqa-deparse-state' class.
 ;;
 ;; `indent' determines indentation of the node, relative to (oref node
 ;; indent).
-(defmethod pgqa-dump ((node pgqa-node) state indent &optional face)
+(defmethod pgqa-dump ((node pgqa-node) state indent)
   "Turn a node and its children into string."
   nil)
+
+;; If buffer-pos is maintained, use it to adjust the start and end position of
+;; the node.
+(defun pgqa-dump-start (node state)
+  (if (oref state buffer-pos)
+      ;; Temporarily set the slot to plain number.
+      (oset node region (oref state buffer-pos))))
+
+(defun pgqa-dump-end (node state)
+  (if (oref state buffer-pos)
+      ;; Retrieve the start position stored by pgqa-dump-start and replace it
+      ;; with 2-element vector.
+      (let* ((start (oref node region))
+	     (end (oref state buffer-pos))
+	     (region (vector start end)))
+	(oset node region region)))
+  )
+
+;; An utility to apply a function to all nodes of a tree.
+;;
+;; If the walker function changes the nodes, caller is responsible for having
+;; taken a copy of the original node.
+;;
+;; Currently it seems more useful to process the sub-nodes before the actual
+;; node.
+(defmethod pgqa-node-walk ((node pgqa-node) walker context)
+  "Run the walker function on sub-nodes and the node itself"
+
+  ;; It seems safer to force each node to implement this function explicitly
+  ;; than to process the node w/o sub-nodes here.
+  (error (format "walker method not implemented for %s class"
+		 (eieio-object-class-name node))))
+
+(defun pgqa-node-walk-list (node-list walker context)
+  "Run the node walker function on each item of a list."
+  (dolist (node node-list)
+    (pgqa-node-walk node walker context)))
 
 ;; Metadata to control deparsing of an SQL query and the contained
 ;; expressions.
@@ -101,6 +181,11 @@ should start.")
     :initarg :line-empty
     :documentation "Is the current line empty or contains only whitespace?")
 
+   (buffer-pos
+    :initarg :buffer-pos
+    :documentation "Position in the output buffer at which the next string will end u."
+    )
+
    (result
     :initarg :result
     :documentation "String to which each node appends its textual
@@ -112,7 +197,7 @@ representation.")
 
 ;; init-col-src is column (in addition to the indentation) at which the source
 ;; query starts.
-(defun pgqa-init-deparse-state (indent init-col-src line-empty)
+(defun pgqa-init-deparse-state (indent init-col-src line-empty buffer-pos)
   "Initialize instance of `pgqa-deparse-state'."
 
   (let ((indent-width (* indent tab-width)))
@@ -122,6 +207,7 @@ representation.")
 		   :next-column (+ indent-width init-col-src)
 		   :next-space 0
 		   :line-empty t
+		   :buffer-pos buffer-pos
 		   :result (make-string indent-width 32))))
 
 (defmethod pgqa-deparse-state-get-attrs ((state pgqa-deparse-state))
@@ -150,6 +236,11 @@ indented."
 			 (make-string indent-width 32)))
     (oset state result result)
     (oset state next-column indent-width)
+
+    ;; buffer-pos might need to account for the strings added.
+    (if (oref state buffer-pos)
+	(oset state buffer-pos (+ (oref state buffer-pos) 1 indent-width)))
+
     (oset state line-empty t))
   )
 
@@ -159,7 +250,12 @@ indented."
     (oset state result
 	  (concat (oref state result)
 		  (make-string space 32)))
-    (oset state next-column (+ (oref state next-column) space)))
+    (oset state next-column (+ (oref state next-column) space))
+
+    ;; buffer-pos might need to account for the strings added.
+    (if (oref state buffer-pos)
+	(oset state buffer-pos (+ (oref state buffer-pos) space))))
+
   ;; Restore the default value of next-space.
   (oset state next-space 1))
 
@@ -187,8 +283,7 @@ indented."
     (pgqa-deparse-space state))
   )
 
-(defmethod pgqa-deparse-string ((state pgqa-deparse-state) str indent
-				&optional face)
+(defmethod pgqa-deparse-string ((state pgqa-deparse-state) str indent)
   "Write arbitrary string to deparsing output."
 
   (pgqa-deparse-string-prepare state str indent)
@@ -200,12 +295,15 @@ indented."
        (string= str "(") (string= str "["))
       (oset state next-space 0))
 
-  (let ((str-highlighted str))
-    (if (and (null noninteractive) face)
-	(add-text-properties 0 (string-width str-highlighted)
-			     '(font-lock-face pgqa-operator) str-highlighted))
-    (oset state result (concat (oref state result) str-highlighted)))
-  (oset state next-column (+ (oref state next-column) (string-width str)))
+  (oset state result (concat (oref state result) str))
+
+  (let ((str-width (string-width str)))
+    (oset state next-column (+ (oref state next-column) str-width))
+
+    ;; buffer-pos might need to account for the strings added.
+    (if (oref state buffer-pos)
+	(oset state buffer-pos (+ (oref state buffer-pos) str-width))))
+
   ;; clear line-empty if there string contains non-whitespace character.
   (if (string-match "\\S-" str)
       (oset state line-empty nil)))
@@ -292,6 +390,7 @@ indented."
 (defmethod pgqa-dump ((node pgqa-query) state &optional indent)
   "Turn query into a string."
 
+  (pgqa-dump-start node state)
   ;; For mutiline output, compute the first column for expressions.
   ;;
   ;; TODO Adjust when adding the missing keywords.
@@ -316,7 +415,7 @@ indented."
 	(if (slot-boundp node 'group-expr)
 	    (push "GROUP BY" top-clauses))
 
-	(if (slot-boundp node 'group-expr)
+	(if (slot-boundp node 'order-expr)
 	    (push "ORDER BY" top-clauses))
 
 	;; Find out the maximum length.
@@ -375,7 +474,29 @@ indented."
     (if (slot-boundp node 'order-expr)
 	(pgqa-dump (oref node order-expr) state 0))
     )
-  )
+  (pgqa-dump-end node state))
+
+(defmethod pgqa-node-walk ((node pgqa-query) walker context)
+  (if (slot-boundp node 'target-expr)
+      (pgqa-node-walk (oref node target-expr) walker context))
+
+  (if (slot-boundp node 'target-table)
+      (pgqa-node-walk (oref node target-table) walker context))
+
+  (if (slot-boundp node 'from-expr)
+      (let ((fe (oref node from-expr)))
+	(if (oref fe from-list)
+	    (pgqa-node-walk-list (oref fe from-list) walker context))
+	(if (slot-boundp fe 'qual)
+	    (pgqa-node-walk (oref fe qual) walker context))))
+
+  (if (slot-boundp node 'group-expr)
+      (pgqa-node-walk (oref node group-expr) walker context))
+
+  (if (slot-boundp node 'order-expr)
+      (pgqa-node-walk (oref node order-expr) walker context))
+
+  (funcall walker node context))
 
 (defclass pgqa-from-expr (pgqa-node)
   (
@@ -386,6 +507,8 @@ indented."
 )
 
 (defmethod pgqa-dump ((node pgqa-from-expr) state indent)
+  (pgqa-dump-start node state)
+
   (let ((from-list (oref node from-list))
 	(indent-clause))
 
@@ -398,6 +521,7 @@ indented."
     (if (> (length from-list) 0)
 	(progn
 	  (pgqa-deparse-top-keyword state "FROM" nil)
+
 	  (if pgqa-clause-newline
 	      (pgqa-deparse-newline state indent-clause))
 
@@ -433,7 +557,7 @@ indented."
 	(if pgqa-clause-newline
 	    (pgqa-deparse-newline state indent-clause))
 	(pgqa-dump (oref node qual) state indent-clause)))
-  )
+  (pgqa-dump-end node state))
 
 ;; A single argument represents table, function, subquery or VALUES clause. If
 ;; the 'args slot has elements, the FROM list entry is a join.
@@ -458,6 +582,7 @@ indented."
 (defmethod pgqa-dump ((node pgqa-from-list-entry) state indent)
   "Print out FROM list entry (table, join, subquery, etc.)."
 
+  (pgqa-dump-start node state)
   (let* ((args (oref node args))
 	 (nargs (length args))
 	 (is-join (= nargs 2))
@@ -499,7 +624,14 @@ indented."
     (if (slot-boundp node 'alias)
 	(pgqa-dump (oref node alias) state indent))
     )
-  )
+  (pgqa-dump-end node state))
+
+(defmethod pgqa-node-walk ((node pgqa-from-list-entry) walker context)
+  (if (slot-boundp node 'alias)
+      (funcall walker (oref node alias) context))
+  (if (slot-boundp node 'qual)
+      (funcall walker (oref node qual) context))
+  (funcall walker node context))
 
 ;; Query in the FROM list is not a typical from-list-entry.
 ;;
@@ -515,7 +647,6 @@ indented."
 
   (pgqa-deparse-string state "(" indent)
 
-
   (let ((state-loc state))
     (if pgqa-multiline-query
 	;; Use a separate state to print out query.
@@ -523,7 +654,8 @@ indented."
 	;; init-col-src of 1 stands for the opening parenthesis.
 	(progn
 	  (setq state-loc (pgqa-init-deparse-state
-			   (+ (oref state indent) indent) 1 t))
+			   (+ (oref state indent) indent) 1 t
+			   (oref state buffer-pos)))
 	  (oset state-loc next-column (oref state next-column))
 	  (oset state-loc result (oref state result))))
 
@@ -542,8 +674,7 @@ indented."
   "From list entry alias."
 )
 
-(defmethod pgqa-dump ((node pgqa-from-list-entry-alias) state indent
-		      &optional face)
+(defmethod pgqa-dump ((node pgqa-from-list-entry-alias) state indent)
   "Turn alias into a string."
   (pgqa-deparse-string state "AS" indent)
   (pgqa-deparse-string state (oref node name) indent))
@@ -557,6 +688,8 @@ indented."
 )
 
 (defmethod pgqa-dump ((node pgqa-sortgroup-expr) state indent)
+  (pgqa-dump-start node state)
+
   (let* ((indent-clause)
 	 (expr-tmp)
 	 (kwd)
@@ -580,7 +713,7 @@ indented."
 	(pgqa-deparse-newline state indent-clause))
 
     (pgqa-dump comma state indent-clause))
-  )
+  (pgqa-dump-end node state))
 
 (defclass pgqa-func-call (pgqa-node)
   (
@@ -591,21 +724,26 @@ indented."
   "Function call"
 )
 
+(defmethod pgqa-node-walk ((node pgqa-func-call) walker context)
+  (funcall walker (oref node name) context)
+  (if (oref node args)
+      (pgqa-node-walk walker (oref node args) context))
+  (funcall walker node context))
+
 (defmethod pgqa-dump ((node pgqa-func-call) state indent)
   "Print out function call"
 
-  ;; Here pgqa-operator stands for face, not the operator object.
-  (pgqa-dump (oref node name) state indent pgqa-operator)
+  (pgqa-dump (oref node name) state indent)
 
   ;; No space between function name and the parenthesis.
   (oset state next-space 0)
-  (pgqa-deparse-string state "(" indent pgqa-operator)
+  (pgqa-deparse-string state "(" indent)
   (let ((args (oref node args)))
     (if (> (length args) 0)
 	(pgqa-dump args state indent)))
   ;; Likewise, no space after.
   (oset state next-space 0)
-  (pgqa-deparse-string state ")" indent pgqa-operator)
+  (pgqa-deparse-string state ")" indent)
 )
 
 ;; Number is currently stored as a string - should this be changed?
@@ -617,10 +755,18 @@ indented."
 
 (defmethod pgqa-dump ((node pgqa-number) state indent)
   "Turn number into a string."
+
+  (pgqa-dump-start node state)
+
   (let ((str (oref node value)))
     (pgqa-deparse-string state str indent))
-  )
 
+  (pgqa-dump-end node state))
+
+(defmethod pgqa-node-walk ((node pgqa-number) walker context)
+  (funcall walker node context))
+
+;; TODO Check if alias is needed here - pgqa-target-entry has it too.
 (defclass pgqa-obj (pgqa-node)
   (
    ;; x.y expression can represent either column "y" of table "x" or table "y"
@@ -640,14 +786,29 @@ indented."
    )
   "Table or column reference.")
 
-(defmethod pgqa-dump ((node pgqa-obj) state indent &optional face)
+(defmethod pgqa-dump ((node pgqa-obj) state indent)
   "Turn an SQL object into a string."
+
+  (pgqa-dump-start node state)
   (let ((str (mapconcat 'format (oref node args) ".")))
-    (pgqa-deparse-string state str indent face)))
+    (pgqa-deparse-string state str indent))
+  (pgqa-dump-end node state))
+
+(defmethod pgqa-node-walk ((node pgqa-obj) walker context)
+  ;; The individual args are strings, so only process the alias.
+  (if (slot-boundp node 'alias)
+      (funcall walker (oref node alias) context))
+  (funcall walker node context))
 
 (defclass pgqa-operator (pgqa-expr)
   (
    (op :initarg :op)
+
+   ;; Region info and marker of the operator string is stored separate so that
+   ;; access to the string remains straightforward.
+   (op-node :initarg :op-node
+	    :initform nil)
+
    (prec :initarg :prec
 	 :documentation "Operator precedence, for the sake of printing.")
    (postfix :initarg :postfix
@@ -712,6 +873,8 @@ operator. nil indicates it's a prefix operator.")
 
 (defmethod pgqa-dump ((node pgqa-operator) state indent)
   "Turn operator expression into a string."
+
+  (pgqa-dump-start node state)
   (let* ((args (oref node args))
 	 (nargs (length args))
 	 (op (oref node op))
@@ -758,11 +921,18 @@ operator. nil indicates it's a prefix operator.")
 	      (if omit-space
 	      	  (oset state next-space 0))
 
-	      ;; Assign a face if op is a "regular operator".
-	      (let ((face))
-		(if (null (string= op ","))
-		    (setq face pgqa-operator))
-		(pgqa-deparse-string state op indent face))))
+	      ;; Use pgqa-dump-start / pgqa-dump-end to mark set the region of
+	      ;; the operator string. This is needed so we can eventually
+	      ;; assign face to the string.
+	      (if (oref node op-node)
+		  (pgqa-dump-start (oref node op-node) state))
+
+	      (pgqa-deparse-string state op indent)
+
+	      (if (oref node op-node)
+		  (pgqa-dump-end (oref node op-node) state)))
+
+	  )
 
 	;; Ensure correct initial position for the argument output in case the
 	;; operator spans multiple lines.
@@ -879,14 +1049,30 @@ operator. nil indicates it's a prefix operator.")
 	      (pgqa-deparse-string state ")" indent)))
 
 	(if (and is-unary (oref node postfix))
-	    (pgqa-deparse-string state op indent))
+	    (progn
+	      ;; TODO This part appears above for binary and unary prefix
+	      ;; operators. Move it into a new function
+	      ;; (pgqa-deparse-op-string?)
+	      (if (oref node op-node)
+		  (pgqa-dump-start (oref node op-node) state))
+
+	      (pgqa-deparse-string state op indent)
+
+	      (if (oref node op-node)
+		  (pgqa-dump-end (oref node op-node) state))))
 
 	(setq i (1+ i))
 
 	(setq arg-multiline-prev arg-multiline))
       )
     )
-)
+  (pgqa-dump-end node state))
+
+(defmethod pgqa-node-walk ((node pgqa-operator) walker context)
+  (pgqa-node-walk-list (oref node args) walker context)
+  (if (oref node op-node)
+      (funcall walker (oref node op-node) context))
+  (funcall walker node context))
 
 (defclass pgqa-target-entry (pgqa-node)
   (
@@ -898,6 +1084,7 @@ operator. nil indicates it's a prefix operator.")
 (defmethod pgqa-dump ((node pgqa-target-entry) state indent)
   "Turn target list entry into a string."
 
+  (pgqa-dump-start node state)
   (pgqa-dump (oref node expr) state indent)
 
   (if (slot-boundp node 'alias)
@@ -905,6 +1092,10 @@ operator. nil indicates it's a prefix operator.")
 	(pgqa-deparse-string state "AS" indent)
 	(pgqa-deparse-string state (oref node alias) indent))
     )
-)
+  (pgqa-dump-end node state))
+
+(defmethod pgqa-node-walk ((node pgqa-target-entry) walker context)
+  (pgqa-node-walk (oref node expr) walker context)
+  (funcall walker node context))
 
 (provide 'pgqa-node)
