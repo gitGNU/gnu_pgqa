@@ -20,7 +20,7 @@
 (defun pgqa-run-single-formatting-test (&optional indent)
   (let ((state))
     (pgqa-check-customizations)
-    (pgqa-parse t)
+    (pgqa-parse)
     (setq state (pgqa-deparse-batch indent))
     (princ (oref state result))))
 

@@ -1029,22 +1029,17 @@ whichever is available."
 
 ;; TODO Consider declaring and handling the parameters like fill-paragraph
 ;; does (especially with REGION).
-(defun pgqa-parse (&optional text-only)
+(defun pgqa-parse ()
   "Parse the SQL query contained in the buffer and bind result to \
 `pgqa-query-tree' variable. If the variable already contained another tree, \
 it's replaced."
   (interactive)
 
-  ;; While pgqa-deparse (callled via pgqa-pgqa-format query) may be useful
-  ;; outside the pgqa major mode, parsing alone is not. For example, it'd
-  ;; result in incomplete syntax highlighting or setup of markers / overlays
-  ;; for which the related functionality might not be available (user would
-  ;; miss at least key bindings, availability of other functionality should be
-  ;; investigated). XXX Consider if pgqa minor mode would help here.
-  (if (and (not noninteractive) (not (equal major-mode 'pgqa-mode)))
-      (user-error "Only contents of query buffer can be parsed."))
-
-  (pgqa-parse-common text-only))
+  ;; Add markers, overlays and faces only to buffers in the pgqa mode and only
+  ;; if Emacs runs interactively.
+  (let ((text-only (or (null (equal major-mode 'pgqa-mode)) noninteractive)))
+    (pgqa-parse-common text-only))
+  )
 
 ;; text-only tells that no markers, overlays, faces, etc. should be added to
 ;; the query.
@@ -1223,25 +1218,31 @@ in front of each line."
       ;; contained in (oref state indent).
       (pgqa-dump pgqa-query-tree state 0)
 
-      (delete-region start end)
+      (let ((pgqa-orig (eq major-mode 'pgqa-mode)))
+	(delete-region start end)
 
-      (save-excursion
-	(goto-char start)
-	(insert (oref state result))
+	(save-excursion
+	  (goto-char start)
+	  (insert (oref state result))
 
-	(if (null text-only)
-	    (progn
-	      ;; Add markers and overlays. (Deletion performed unconditionally
-	      ;; above as we have no information if the existing buffer
-	      ;; contents contained those objects.)
-	      (pgqa-setup-query-gui pgqa-query-tree)
+	  (if (null text-only)
+	      (progn
+		;; Add markers and overlays. (Deletion performed
+		;; unconditionally above as we have no information if the
+		;; existing buffer contents contained those objects.)
+		(pgqa-setup-query-gui pgqa-query-tree)
 
-	      ;; Add faces. (Cleanup not needed -- the query string was
-	      ;; created from scratch.)
-	      (pgqa-set-query-faces pgqa-query-tree))
+		;; Add faces. (Cleanup not needed -- the query string was
+		;; created from scratch.)
+		(pgqa-set-query-faces pgqa-query-tree))
+	    )
 	  )
+
+	;; Only turn on the pgqa mode if it was active before.
+	(if pgqa-orig
+	    (pgqa-mode))
 	)
-      (pgqa-mode))
+      )
     )
   )
 

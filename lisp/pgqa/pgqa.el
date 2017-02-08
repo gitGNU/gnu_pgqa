@@ -507,7 +507,7 @@ from first position of the query."
  (pgqa-check-customizations)
 
  ;; Don't set markers during parsing.
- (pgqa-parse t)
+ (pgqa-parse)
  (pgqa-deparse indent))
 
 (defun pgqa-format-query-batch ()
@@ -522,8 +522,7 @@ batch mode"))
 
   (let ((state))
     (pgqa-check-customizations)
-    ;; Do not create markers.
-    (pgqa-parse t)
+    (pgqa-parse)
     (setq state (pgqa-deparse-batch))
     (princ (oref state result))))
 

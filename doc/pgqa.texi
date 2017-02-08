@@ -86,6 +86,10 @@ directory):
 
 ;; Make sure *.sql file suffix activates the PGQA mode automatically.
 (add-to-list 'auto-mode-alist (cons "\\.sql\\'" 'pgqa-mode))
+
+;; pgqa-format-query does not require the pgqa-mode. (Syntax
+;; highlighting is not active w/o the pgqa-mode.)
+(autoload 'pgqa-format-query "pgqa" "Format SQL query." t)
 @end lisp
 
 @noindent
@@ -142,6 +146,12 @@ If the region is used and the first line is preceded by at least one
 non-whitespace character, then the indentation is still estimated (or accepted
 as a prefix argument), but it's not applied to the first line. The idea is
 that user should know why the non-white character is there.
+
+@noindent
+@code{pgqa-format-query} can (as long as autoloading is configured,
+@pxref{Getting Started}) be used even in buffer whose major mode is
+not PGQA, but no syntax highlighting is active in that case. Also no
+key sequence is automatically bound to the command.
 
 @noindent
 @code{fill-column} variable is honored during the formatting.
