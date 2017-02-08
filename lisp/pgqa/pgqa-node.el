@@ -561,9 +561,6 @@ indented."
 
 ;; A single argument represents table, function, subquery or VALUES clause. If
 ;; the 'args slot has elements, the FROM list entry is a join.
-;;
-;; TODO Consider a superclass that both this and pgqa-obj could inherit from
-;; (both need the alias).
 (defclass pgqa-from-list-entry (pgqa-expr)
   (
    ;; Instance of pgqa-from-list-entry-alias.
@@ -766,23 +763,19 @@ indented."
 (defmethod pgqa-node-walk ((node pgqa-number) walker context)
   (funcall walker node context))
 
-;; TODO Check if alias is needed here - pgqa-target-entry has it too.
-(defclass pgqa-obj (pgqa-node)
+(defclass pgqa-obj (pgqa-expr)
   (
+   ;; The :args slot (inherited from pgqa-expr) contains the dot-separated
+   ;; components of table / column reference.
+   ;;
+   ;; XXX Can't we simply use pgqa-expr class here?
+   ;;
    ;; x.y expression can represent either column "y" of table "x" or table "y"
    ;; of schema "x". Instead of teaching parser to recognize the context (is
    ;; it possible?) let's postpone resolution till analysis phase.
    ;;
    ;; Note that the number of arguments is not checked during "raw parsing",
    ;; and that asterisk can be at any position, not only the last one.
-   (args :initarg :args)
-
-   (alias :initarg :alias)
-   ;; TODO
-   ;;
-   ;; 1. Remove double-quotes (and remember there were some?)
-   ;;
-   ;; 2. Turn unquoted values to lower case.
    )
   "Table or column reference.")
 
@@ -796,8 +789,6 @@ indented."
 
 (defmethod pgqa-node-walk ((node pgqa-obj) walker context)
   ;; The individual args are strings, so only process the alias.
-  (if (slot-boundp node 'alias)
-      (funcall walker (oref node alias) context))
   (funcall walker node context))
 
 (defclass pgqa-operator (pgqa-expr)
