@@ -74,7 +74,7 @@
 (defun pgqa-set-node-face (node context)
   (if (eq (eieio-object-class node) 'pgqa-operator)
       (let ((op-node (oref node op-node)))
-	(if op-node
+	(if (and op-node (slot-boundp op-node 'markers))
 	    (let* ((m (oref op-node markers))
 		   (m-start (elt m 0))
 		   (m-end (elt m 1)))
@@ -89,7 +89,7 @@
 (defun pgqa-reset-node-face (node context)
   (if (eq (eieio-object-class node) 'pgqa-operator)
       (let ((op-node (oref node op-node)))
-	(if op-node
+	(if (and op-node (slot-boundp op-node 'markers))
 	    (let* ((m (oref op-node markers))
 		   (m-start (elt m 0))
 		   (m-end (elt m 1)))
