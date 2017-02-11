@@ -1204,7 +1204,12 @@ in front of each line."
 					 ;; nil value of :buffer-pos indicates
 					 ;; that regions should not be set
 					 ;; during deparsing.
-					 (if text-only nil query-start)))
+					 (if text-only nil
+					   ;; 1+ because buffer position is
+					   ;; 1-based.
+					   (1+
+					    (+ (* indent tab-width)
+					       init-col)))))
 
     ;; The leading non-whitespace string replaces the indentation.
     (if (null leading-whitespace)
