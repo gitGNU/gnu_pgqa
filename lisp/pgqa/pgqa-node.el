@@ -730,7 +730,7 @@ indented."
 (defmethod pgqa-node-walk ((node pgqa-func-call) walker context)
   (funcall walker (oref node name) context)
   (if (oref node args)
-      (pgqa-node-walk walker (oref node args) context))
+      (pgqa-node-walk (oref node args) walker context))
   (funcall walker node context))
 
 (defmethod pgqa-dump ((node pgqa-func-call) state indent)
