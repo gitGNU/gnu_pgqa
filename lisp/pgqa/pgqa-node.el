@@ -626,9 +626,15 @@ indented."
 (defmethod pgqa-node-walk ((node pgqa-from-list-entry) walker context)
   (if (slot-boundp node 'alias)
       (funcall walker (oref node alias) context))
-  (if (slot-boundp node 'qual)
-      (funcall walker (oref node qual) context))
-  (funcall walker node context))
+
+  ;; If node is a join, recurse into the sides and process qualifier.
+  (let ((args (oref node args)))
+    (if (= (length args) 2)
+	(progn
+	  (pgqa-node-walk (car args) walker context)
+	  (pgqa-node-walk (car (cdr args)) walker context)
+	  (pgqa-node-walk (oref node qual) walker context)))
+    (funcall walker node context)))
 
 ;; Query in the FROM list is not a typical from-list-entry.
 ;;
