@@ -80,7 +80,7 @@ should start.")
 
    (buffer-pos
     :initarg :buffer-pos
-    :documentation "Position in the output buffer at which the next string will end u."
+    :documentation "Position in the output buffer at which the next string will start."
     )
 
    (result
