@@ -507,7 +507,7 @@ from first position of the query."
  (pgqa-check-customizations)
 
  ;; Don't set markers during parsing.
- (pgqa-parse)
+ (pgqa-parse t)
  (pgqa-deparse indent))
 
 (defun pgqa-format-query-batch ()

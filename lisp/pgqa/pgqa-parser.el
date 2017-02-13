@@ -1030,17 +1030,19 @@ whichever is available."
 
 ;; TODO Consider declaring and handling the parameters like fill-paragraph
 ;; does (especially with REGION).
-(defun pgqa-parse ()
+(defun pgqa-parse (&optional text-only)
   "Parse the SQL query contained in the buffer and bind result to \
 `pgqa-query-tree' variable. If the variable already contained another tree, \
 it's replaced."
   (interactive)
 
-  ;; Add markers, overlays and faces only to buffers in the pgqa mode and only
-  ;; if Emacs runs interactively.
-  (let ((text-only (or (null (equal major-mode 'pgqa-mode)) noninteractive)))
-    (pgqa-parse-common text-only))
-  )
+  ;; Enforce the text-only mode if the buffer is not in pgqa-mode or if it's
+  ;; in batch mode. User is not supposed to pay attention and pass the
+  ;; text-only argument.)
+  (if (and (null text-only)
+	   (or (null (equal major-mode 'pgqa-mode)) noninteractive))
+      (setq text-only t))
+  (pgqa-parse-common text-only))
 
 ;; text-only tells that no markers, overlays, faces, etc. should be added to
 ;; the query.
@@ -1088,7 +1090,24 @@ it's replaced."
 	      (pgqa-setup-query-gui result)
 
 	      (pgqa-reset-query-faces result)
-	      (pgqa-set-query-faces result)))
+	      (pgqa-set-query-faces result))
+	  ;; Except for batch mode, the query should always have the markers
+	  ;; set. This is important so that we know at which position
+	  ;; deparsing should start.
+	  (if (null noninteractive)
+	      (let* ((reg-vec (oref result region))
+		     (reg-start (elt reg-vec 0))
+		     (reg-end (elt reg-vec 1))
+		     (m-start (make-marker))
+		     (m-end (make-marker)))
+		;; TODO Consider reusing the code we already have in
+		;; pgqa-setup-node-gui.
+		(set-marker m-start reg-start)
+		(set-marker m-end reg-end)
+		(set-marker-insertion-type m-start t)
+		(set-marker-insertion-type m-end nil)
+		(oset result markers (vector m-start m-end))))
+	  )
 	(setq pgqa-query-tree result)))
   )
 
@@ -1115,6 +1134,7 @@ in front of each line."
 	 (end (elt region 1))
 
 	 (init-col)
+	 (init-pos)
 	 (init-str)
 	 (leading-whitespace nil)
 	 (indent-estimate 0)
@@ -1200,17 +1220,34 @@ in front of each line."
     (unless indent
       (setq indent 0))
 
+
+    ;; init-pos is buffer position the deparsing starts at.
+    ;;
+    ;; nil value of :buffer-pos indicates that regions should not be set
+    ;; during deparsing.
+    (if (null text-only)
+	(let* ((markers (oref pgqa-query-tree markers))
+	       (m-start (elt markers 0))
+	       )
+	  ;; Find the beginning of the line the deparsing will start at.
+	  (save-excursion
+	    (goto-char m-start)
+	    (beginning-of-line)
+	    (setq init-pos (point)))
+
+	  ;; Account for indentation and additional offset representing
+	  ;; non-whitespace characters.
+	  (setq init-pos (+
+			  init-pos
+			  (+ (* indent tab-width) init-col)))
+
+	  ;; 1+ because buffer position is 1-based.
+	  (setq init-pos (1+ init-pos)))
+      )
+
     (setq state (pgqa-init-deparse-state indent init-col
 					 (null leading-whitespace)
-					 ;; nil value of :buffer-pos indicates
-					 ;; that regions should not be set
-					 ;; during deparsing.
-					 (if text-only nil
-					   ;; 1+ because buffer position is
-					   ;; 1-based.
-					   (1+
-					    (+ (* indent tab-width)
-					       init-col)))))
+					 init-pos))
 
     ;; The leading non-whitespace string replaces the indentation.
     (if (null leading-whitespace)
