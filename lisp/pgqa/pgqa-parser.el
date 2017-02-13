@@ -18,6 +18,7 @@
 (require 'semantic)
 (require 'semantic/lex)
 (require 'semantic/wisent/comp)
+(require 'pgqa-dump)
 
 (setq wisent-parse-verbose-flag t)
 
