@@ -1037,8 +1037,8 @@ it's replaced."
   (interactive)
 
   ;; Enforce the text-only mode if the buffer is not in pgqa-mode or if it's
-  ;; in batch mode. User is not supposed to pay attention and pass the
-  ;; text-only argument.)
+  ;; in batch mode. User is not supposed to pass the text-only as a prefix
+  ;; argument when calling the function interactively.
   (if (and (null text-only)
 	   (or (null (equal major-mode 'pgqa-mode)) noninteractive))
       (setq text-only t))
@@ -1049,6 +1049,17 @@ it's replaced."
 (defun pgqa-parse-common (&optional text-only)
   "Parsing functionality used for both interactive and batch mode."
   (setq pgqa-parse-error nil)
+
+  ;; Do cleaup if this is not the first parsing.
+  (if pgqa-query-tree
+      (progn
+	;; User might explicitly reject the GUI after having created it
+	;; earlier, so text-only does not matter here.
+	(pgqa-reset-query-faces pgqa-query-tree)
+
+	;; Always delete the GUI, to avoid memory leakage (especially with
+	;; respect to markers). Also regardless text-only.
+	(pgqa-delete-query-gui)))
 
   (if (or (null pgqa-automaton) pgqa-parser-always-init
 	  noninteractive)
@@ -1086,10 +1097,7 @@ it's replaced."
       (progn
 	(if (null text-only)
 	    (progn
-	      (pgqa-delete-query-gui)
 	      (pgqa-setup-query-gui result)
-
-	      (pgqa-reset-query-faces result)
 	      (pgqa-set-query-faces result))
 	  ;; Except for batch mode, the query should always have the markers
 	  ;; set. This is important so that we know at which position
@@ -1227,8 +1235,7 @@ in front of each line."
     ;; during deparsing.
     (if (null text-only)
 	(let* ((markers (oref pgqa-query-tree markers))
-	       (m-start (elt markers 0))
-	       )
+	       (m-start (elt markers 0)))
 	  ;; Find the beginning of the line the deparsing will start at.
 	  (save-excursion
 	    (goto-char m-start)
@@ -1261,29 +1268,23 @@ in front of each line."
       ;; contained in (oref state indent).
       (pgqa-dump pgqa-query-tree state 0)
 
-      (let ((pgqa-orig (eq major-mode 'pgqa-mode)))
-	(delete-region start end)
+      (delete-region start end)
 
-	(save-excursion
-	  (goto-char start)
-	  (insert (oref state result))
+      (save-excursion
+	(goto-char start)
+	(insert (oref state result))
 
-	  (if (null text-only)
-	      (progn
-		;; Add markers and overlays. (Deletion performed
-		;; unconditionally above as we have no information if the
-		;; existing buffer contents contained those objects.)
-		(pgqa-setup-query-gui pgqa-query-tree)
+	(if (null text-only)
+	    (progn
+	      ;; Add markers and overlays. (Deletion performed unconditionally
+	      ;; above as we have no information if the existing buffer
+	      ;; contents contained those objects.)
+	      (pgqa-setup-query-gui pgqa-query-tree)
 
-		;; Add faces. (Cleanup not needed -- the query string was
-		;; created from scratch.)
-		(pgqa-set-query-faces pgqa-query-tree))
-	    )
+	      ;; Add faces. (Cleanup not needed -- the query string was
+	      ;; created from scratch.)
+	      (pgqa-set-query-faces pgqa-query-tree))
 	  )
-
-	;; Only turn on the pgqa mode if it was active before.
-	(if pgqa-orig
-	    (pgqa-mode))
 	)
       )
     )
