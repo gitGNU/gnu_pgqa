@@ -241,6 +241,9 @@
   "GROUP BY or ORDER BY expression."
 )
 
+(defmethod pgqa-node-walk ((node pgqa-sortgroup-expr) walker context)
+  (pgqa-node-walk-list (oref node args) walker context))
+
 (defclass pgqa-func-call (pgqa-node)
   (
    (name :initarg :name)
