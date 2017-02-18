@@ -569,12 +569,17 @@ indented."
 		;; indent argument of the function is relative to (oref state
 		;; indent), so compute "absolute value".
 		(+ (oref state indent) indent)
-		(/ (oref state next-column) tab-width))))
+		(/ (oref state next-column) tab-width)))
+	      (indent-extra-spaces))
 	  ;; indent is for the operator, so add 1 more level for the argument.
 	  (setq indent-extra (1+ indent-extra))
+	  (setq indent-extra-spaces (* indent-extra tab-width))
 	  (oset state result
 		(concat (oref state result)
-			(make-string (* indent-extra tab-width) 32))))
+			(make-string indent-extra-spaces 32)))
+	  (if (oref state buffer-pos)
+	      (oset state buffer-pos (+ (oref state buffer-pos)
+					indent-extra-spaces))))
       (progn
 	(pgqa-deparse-newline state (1+ indent))
 	(oset state next-space 0))))

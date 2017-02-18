@@ -1246,10 +1246,7 @@ in front of each line."
 	  ;; non-whitespace characters.
 	  (setq init-pos (+
 			  init-pos
-			  (+ (* indent tab-width) init-col)))
-
-	  ;; 1+ because buffer position is 1-based.
-	  (setq init-pos (1+ init-pos)))
+			  (+ (* indent tab-width) init-col))))
       )
 
     (setq state (pgqa-init-deparse-state indent init-col
