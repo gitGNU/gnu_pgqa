@@ -189,7 +189,10 @@
 	(progn
 	  (pgqa-node-walk (car args) walker context)
 	  (pgqa-node-walk (car (cdr args)) walker context)
-	  (pgqa-node-walk (oref node qual) walker context)))
+	  (pgqa-node-walk (oref node qual) walker context))
+      ;; Query needs recursive processing.
+      (if (eq (eieio-object-class-name (car args)) 'pgqa-query)
+	  (pgqa-node-walk (car args) walker context)))
     (funcall walker node context)))
 
 ;; Query in the FROM list is not a typical from-list-entry.
@@ -219,7 +222,12 @@
 	  (oset state-loc result (oref state result))))
 
     (pgqa-dump query state-loc 0)
-    (oset state result (oref state-loc result)))
+    (oset state result (oref state-loc result))
+
+    (if pgqa-multiline-query
+	(progn
+	  (oset state next-column (oref state-loc next-column))
+	  (oset state buffer-pos (oref state-loc buffer-pos)))))
 
   (oset state next-space 0)
   (pgqa-deparse-string state ")" indent)
