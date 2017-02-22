@@ -1,8 +1,12 @@
-User documentation is available at https://www.nongnu.org/pgqa/index.html#doc
+User documentation is available at http://www.nongnu.org/pgqa/index.html#doc
 
 Development takes place at https://savannah.nongnu.org/projects/pgqa/
 
 The development is in very early stage now. If you miss any feature, consider
-contribution to the project or just check later. If you think you've found a
-bug, please report it.
+contribution to the project or just check later.
+
+If you think you've found a bug, please use the following mailing list to
+report it
+
+       https://lists.nongnu.org/mailman/listinfo/pgqa-dev
 
