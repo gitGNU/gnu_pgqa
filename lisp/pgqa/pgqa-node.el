@@ -195,44 +195,6 @@
 	  (pgqa-node-walk (car args) walker context)))
     (funcall walker node context)))
 
-;; Query in the FROM list is not a typical from-list-entry.
-;;
-;; TODO Consider custom variable that controls whether parentheses are on the
-;; same lines the query starts and ends respectively.
-(defun pgqa-dump-from-list-query (query state indent)
-  ;; XXX Can we do anything batter than breaking the line if either or
-  ;; pgqa-join-newline or pgqa-multiline-join (or both) are nil?
-  (if (and (null (oref state line-empty)) pgqa-multiline-query)
-      (progn
-	(oset state next-space 0)
-	(pgqa-deparse-newline state indent)))
-
-  (pgqa-deparse-string state "(" indent)
-
-  (let ((state-loc state))
-    (if pgqa-multiline-query
-	;; Use a separate state to print out query.
-	;;
-	;; init-col-src of 1 stands for the opening parenthesis.
-	(progn
-	  (setq state-loc (pgqa-init-deparse-state
-			   (+ (oref state indent) indent) 1 t
-			   (oref state buffer-pos)))
-	  (oset state-loc next-column (oref state next-column))
-	  (oset state-loc result (oref state result))))
-
-    (pgqa-dump query state-loc 0)
-    (oset state result (oref state-loc result))
-
-    (if pgqa-multiline-query
-	(progn
-	  (oset state next-column (oref state-loc next-column))
-	  (oset state buffer-pos (oref state-loc buffer-pos)))))
-
-  (oset state next-space 0)
-  (pgqa-deparse-string state ")" indent)
-)
-
 ;; TODO Store argument list to :args if the alias has some.
 (defclass pgqa-from-list-entry-alias (pgqa-expr)
   (
