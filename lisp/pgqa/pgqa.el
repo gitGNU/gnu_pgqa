@@ -105,9 +105,12 @@ variables are set."
 (defvar-local pgqa-query-overlays nil
   "List of overlays applied to the current query.")
 
-(defun pgqa-setup-query-gui (query)
-  "Add markers and overlays to query nodes."
-  (pgqa-node-walk query 'pgqa-setup-node-gui nil))
+(defun pgqa-setup-query-gui (query trim)
+  "Add markers and overlays to query nodes.
+
+`trim' tells that leading whitespace should not be included in node regions."
+
+  (pgqa-node-walk query 'pgqa-setup-node-gui trim))
 
 (defun pgqa-delete-query-gui ()
   "Delete overlays and make markers available for garbage collection."

@@ -1097,7 +1097,7 @@ it's replaced."
       (progn
 	(if (null text-only)
 	    (progn
-	      (pgqa-setup-query-gui result)
+	      (pgqa-setup-query-gui result nil)
 	      (pgqa-set-query-faces result))
 	  ;; Except for batch mode, the query should always have the markers
 	  ;; set. This is important so that we know at which position
@@ -1276,7 +1276,11 @@ in front of each line."
 	      ;; Add markers and overlays. (Deletion performed unconditionally
 	      ;; above as we have no information if the existing buffer
 	      ;; contents contained those objects.)
-	      (pgqa-setup-query-gui pgqa-query-tree)
+	      ;;
+	      ;; The initial whitespace is not to be included in the node
+	      ;; markers. (That whitespace would be too hard to skip during
+	      ;; deparsing.)
+	      (pgqa-setup-query-gui pgqa-query-tree t)
 
 	      ;; Add faces. (Cleanup not needed -- the query string was
 	      ;; created from scratch.)

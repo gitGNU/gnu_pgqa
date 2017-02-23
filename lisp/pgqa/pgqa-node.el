@@ -40,6 +40,11 @@
 
 ;; Besides attaching the markers and overlays to nodes, add them to
 ;; pgqa-query-markers and pgqa-query-overlays lists, for easy cleanup.
+;;
+;; context is currently used to indicate that the regions have been
+;; initialized during a dump, which can't easily avoid leading whitespace. So
+;; if the value is non-nil, we should skip that whitespace when setting up the
+;; marker.
 (defun pgqa-setup-node-gui (node context)
   "Turn region(s) into a markers and add overlay(s) to the node."
   (let* ((reg-vec (oref node region))
@@ -48,6 +53,17 @@
 	 (m-start (make-marker))
 	 (m-end (make-marker))
 	 (o))
+
+    ;; If the region might start with a whitespace, skip it (the whitespace).
+    (if context
+	(progn
+	  (goto-char reg-start)
+	  (while (and (looking-at "\\s-\\|\$")
+		      (< reg-start (point-max)))
+	    (progn
+	      (setq reg-start (1+ reg-start))
+	      (goto-char reg-start)))))
+
     (set-marker m-start reg-start)
     (set-marker m-end reg-end)
 
