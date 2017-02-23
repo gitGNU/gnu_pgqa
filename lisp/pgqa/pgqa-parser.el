@@ -1059,7 +1059,9 @@ it's replaced."
 
 	;; Always delete the GUI, to avoid memory leakage (especially with
 	;; respect to markers). Also regardless text-only.
-	(pgqa-delete-query-gui)))
+	(pgqa-delete-query-gui)
+
+	(setq pgqa-query-tree nil)))
 
   (if (or (null pgqa-automaton) pgqa-parser-always-init
 	  noninteractive)
