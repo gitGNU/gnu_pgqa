@@ -43,6 +43,9 @@ Can only be set if `pgqa-multiline-query' variable is set."
   "If non-nil, the tables joined (i.e. not only the JOIN operator) start on a
 new line.
 
+If either side of the join requires parentheses (i.e. it's a sub-query or a
+join), it starts on a new line regardless this setting.
+
 Can only be set if `pgqa-multiline-join' variable is set."
   :type 'boolean
 )
@@ -56,6 +59,9 @@ Can only be set if `pgqa-multiline-query' variable is set."
 
 (defcustom pgqa-clause-item-newline nil
   "If non-nil, each item of query clause starts on a new line
+
+If the item requires parentheses (i.e. it's a sub-query or a join), this
+setting is always considered t.
 
 Can only be set if `pgqa-clause-newline' variable is set."
   :type 'boolean

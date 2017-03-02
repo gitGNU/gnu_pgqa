@@ -9,8 +9,7 @@ p.product_id = s.product_id GROUP BY
 p.category_id
 
 SELECT          p.category_id, SUM(sum_nitems), SUM(sum_price)
-FROM
-                (SELECT         product_id, SUM(nitems) AS sum_nitems,
+FROM            (SELECT         product_id, SUM(nitems) AS sum_nitems,
                                 SUM(price) AS sum_price
                 FROM            sales
                 GROUP BY        product_id) AS p JOIN
@@ -22,8 +21,7 @@ FROM
 GROUP BY        p.category_id
 
 SELECT          p.category_id, SUM(sum_nitems), SUM(sum_price)
-FROM
-                (SELECT         product_id, SUM(nitems) AS sum_nitems,
+FROM            (SELECT         product_id, SUM(nitems) AS sum_nitems,
                                 SUM(price) AS sum_price
                 FROM            sales
                 GROUP BY        product_id) AS p
@@ -36,8 +34,7 @@ FROM
 GROUP BY        p.category_id
 
 SELECT          p.category_id, SUM(sum_nitems), SUM(sum_price)
-FROM
-                (SELECT         product_id, SUM(nitems) AS sum_nitems,
+FROM            (SELECT         product_id, SUM(nitems) AS sum_nitems,
                                 SUM(price) AS sum_price
                 FROM            sales
                 GROUP BY        product_id) AS p
@@ -50,8 +47,7 @@ FROM
 GROUP BY        p.category_id
 
 SELECT          p.category_id, SUM(sum_nitems), SUM(sum_price)
-FROM
-                (SELECT         product_id, SUM(nitems) AS sum_nitems, SUM(price)
+FROM            (SELECT         product_id, SUM(nitems) AS sum_nitems, SUM(price)
                                 AS sum_price
                 FROM            sales
                 GROUP BY        product_id) AS p
@@ -134,8 +130,7 @@ SELECT
                 p.category_id,
                 SUM(sum_nitems),
                 SUM(sum_price)
-FROM
-                (SELECT
+FROM            (SELECT
                                 product_id,
                                 SUM(nitems)
                                 AS
@@ -230,8 +225,7 @@ GROUP BY
                 GROUP BY p.category_id
 
                 SELECT          p.category_id, SUM(sum_nitems), SUM(sum_price)
-                FROM
-                                (SELECT         product_id, SUM(nitems) AS
+                FROM            (SELECT         product_id, SUM(nitems) AS
                                                 sum_nitems, SUM(price) AS
                                                 sum_price
                                 FROM            sales

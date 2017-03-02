@@ -361,6 +361,27 @@ indented."
     )
   (pgqa-dump-end node state))
 
+;; Find out if from-list-entry needs to be parenthesized.
+;;
+;; join-rhs is t if the node is join RHS, nil if its join LHS or
+;; an item of the FROM-list.
+(defun pgqa-from-list-entry-needs-parens (node join-rhs)
+  (if (eq (eieio-object-class node) 'pgqa-from-list-entry)
+      (let ((is-join (= (length (oref node args)) 2))
+	    (is-query (string= (oref node kind) "query")))
+	;; Query needs the parentheses always, join only if it's on the right side
+	;; of another join or if it has an alias.
+	(or is-query (and is-join (or join-rhs (slot-boundp node 'alias))))))
+  )
+
+;; Return the FROM-list subquery or nil if the entry is something else (table,
+;; join, etc.).
+(defun pgqa-get-from-list-suquery (fe)
+  (if (and (eq (eieio-object-class fe) 'pgqa-from-list-entry)
+	    (string= (oref fe kind) "query"))
+      (car (oref fe args)))
+  )
+
 (defmethod pgqa-dump ((node pgqa-from-expr) state indent)
   (pgqa-dump-start node state)
 
@@ -377,22 +398,76 @@ indented."
 	(progn
 	  (pgqa-deparse-top-keyword state "FROM" nil)
 
-	  (if pgqa-clause-newline
-	      (pgqa-deparse-newline state indent-clause))
+	  ;; (if pgqa-clause-newline
+	  ;;     (pgqa-deparse-newline state indent-clause))
 
-	  (if (= (length from-list) 1)
-	      (pgqa-dump (car from-list) state indent-clause)
-	    ;; Line breaks and indentation are best handled if we turn the list
-	    ;; into a comma operator.
-	    ;;
-	    ;; XXX Shouldn't this be done by parser?
-	    (let (
-		  (l (make-instance 'pgqa-operator :op ","
-				    :args from-list
-				    :prec pgqa-precedence-comma))
-		  )
-	      (pgqa-dump l state indent-clause)
-	      )
+	  (let* ((i 0)
+		 (fe-query)
+		 (newline)
+		 (parens)
+		 (is-join))
+	    (dolist (item from-list)
+	      (if (> i 0)
+		  (progn
+		    (oset state next-space 0)
+		    (pgqa-deparse-string state "," indent-clause)
+		    ;; In general, comma should be followed by a space. As for
+		    ;; special cases, we'll set it to zero explicitly below.
+		    (if (null pgqa-join-newline)
+			(oset state next-space 1))))
+
+	      (setq parens (pgqa-from-list-entry-needs-parens item nil))
+	      (setq is-join (= (length (oref item args)) 2))
+	      (setq fe-query (pgqa-get-from-list-suquery item))
+
+	      ;; XXX Can we do anything better than breaking the line if
+	      ;; parens is t but pgqa-clause-item-newline is nil?
+	      ;;
+	      ;; TODO Consider newline even if pgqa-join-newline is nil but
+	      ;; the next entry is a join that starts with left parenthesis
+	      ;; (i.e. the join needs the parentheses itself, or its left-most
+	      ;; argument does).
+	      (setq newline
+		    (or
+		     (and (= i 0) pgqa-clause-newline)
+		     (and
+		      (> i 0)
+		      (or (and parens pgqa-multiline-query) pgqa-clause-item-newline
+			  (and is-join pgqa-join-newline))
+		      (null (oref state line-empty)))))
+
+	      (if newline
+		  (pgqa-deparse-newline state indent-clause))
+
+	      ;; Set next-space to 0 to avoid unnecessary space, or even
+	      ;; newline in the case of a join.
+	      (if (> (oref state next-space) 0)
+		  (if (or parens is-join pgqa-clause-item-newline)
+		      (progn
+			;; Only apply the space if non-empty line continues
+			;; here.
+			(if (null (oref state line-empty))
+			    (pgqa-deparse-space state))
+			(oset state next-space 0))
+		    )
+		)
+
+	      (if parens
+		  (pgqa-deparse-string state "(" indent))
+
+	      (if fe-query
+		  (pgqa-dump-from-list-query (car (oref item args))
+					     state indent-clause)
+		(pgqa-dump item state indent-clause))
+
+              (if parens
+                  (progn
+                    (oset state next-space 0)
+                    (pgqa-deparse-string state ")" indent-clause)))
+
+	      (if (slot-boundp item 'alias)
+		  (pgqa-dump (oref item alias) state indent-clause))
+	      (setq i (1+ i)))
 	    )
 	  )
       )
@@ -422,19 +497,71 @@ indented."
 	 (nargs (length args))
 	 (is-join (= nargs 2))
 	 (arg (car args))
-	 (arg-is-query (eq (eieio-object-class arg) 'pgqa-query)))
+	 (fe-query)
+	 (parens)
+	 (newline)
+	 ;; If this happens to be a join nested in another one, that upper
+	 ;; join might use next-space to indicate that it already took care of
+	 ;; the newline.
+	 (no-space (and is-join (= (oref state next-space) 0))))
+
     (cl-assert (or (= nargs 1) (= nargs 2)))
 
-    (if (and is-join pgqa-join-newline
-	     ;; Only break the line if it hasn't just happened for any reason.
-	     (null (oref state line-empty)))
+    (setq parens (pgqa-from-list-entry-needs-parens arg nil))
+    (if (null is-join)
 	(progn
-	  (oset state next-space 0)
-	  (pgqa-deparse-newline state indent)))
+	  ;; If the node is query, it'll be handled by upper node, which is
+	  ;; responsible for parentheses and line breaks.
+	  (setq fe-query (pgqa-get-from-list-suquery node))
+	  (if (null fe-query)
+	      (pgqa-dump arg state indent)))
+      (progn
+	;; arg is LHS of the join.
+	;;
+	;; XXX Can we do anything smarter than breaking the line if parens is
+	;; t but pgqa-join-newline is nil?
+	(setq newline
+	      (and
+	       pgqa-multiline-query
+	       (or parens pgqa-join-newline)
+	       ;; Only break the line if it hasn't just happened for any
+	       ;; reason.
+	       (null (oref state line-empty))
+	       ;; The purpose of no-space is explained above.
+	       (null no-space)))
 
-    (if (null arg-is-query)
-	(pgqa-dump arg state indent)
-      (pgqa-dump-from-list-query arg state indent))
+	(if newline
+	    (progn
+	      ;; TODO Shouldn't pgqa-deparse-newline set next-space to zero?
+	      (pgqa-deparse-newline state indent)
+	      (oset state next-space 0)))
+
+	(if parens
+	    (progn
+	      ;; There should be no space in front of the next character, but
+	      ;; we also set next-space to zero to indicate that nested entry
+	      ;; should not be preceded by a newline.
+	      (oset state next-space 0)
+
+	      (pgqa-deparse-string state "(" indent)))
+
+	(setq fe-query (pgqa-get-from-list-suquery arg))
+
+	(if fe-query
+	    (pgqa-dump-from-list-query fe-query state indent)
+	  (pgqa-dump arg state indent))
+
+	(if parens
+	    (progn
+	      (oset state next-space 0)
+	      (pgqa-deparse-string state ")" indent)))
+
+	;; Print the alias separate so that it does not appear inside the
+	;; parentheses.
+	(if (slot-boundp arg 'alias)
+	    (pgqa-dump (oref arg alias) state indent))
+	)
+      )
 
     (if is-join
 	(progn
@@ -445,19 +572,52 @@ indented."
 
 	  (let ((kind (oref node kind)))
 	    (if kind
-	      (pgqa-deparse-string state (upcase kind) indent)))
+		(pgqa-deparse-string state (upcase kind) indent)))
 	  (pgqa-deparse-string state "JOIN" indent)
 
-	  (setq arg (nth 1 args))
-	  (pgqa-dump arg state indent)
+	  ;; The right side of a join might require parentheses.
+	  (let* ((arg (nth 1 args)))
+	    (setq parens (pgqa-from-list-entry-needs-parens arg t))
+	    ;; XXX Can we do anything smarter than breaking the line if parens
+	    ;; is t but pgqa-join-newline is nil?
+	    (setq newline
+		  (and pgqa-multiline-query
+		       (or parens pgqa-join-newline)
+		       ;; Only break the line if it hasn't just happened for
+		       ;; any reason.
+		       (null (oref state line-empty))))
+
+	    (if newline
+		(progn
+		  (oset state next-space 0)
+		  (pgqa-deparse-newline state indent)))
+
+	    (if parens
+		(pgqa-deparse-string state "(" indent))
+
+	    (setq fe-query (pgqa-get-from-list-suquery arg))
+
+	    (if fe-query
+		(pgqa-dump-from-list-query fe-query state indent)
+	      (pgqa-dump arg state indent))
+
+	    (if parens
+		(progn
+		  (oset state next-space 0)
+		  (pgqa-deparse-string state ")" indent)))
+
+	    ;; pgqa-dump-from-list-query couldn't print the alias because thus
+	    ;; it'd appear inside the parentheses.
+	    (if (slot-boundp arg 'alias)
+		(pgqa-dump (oref arg alias) state indent)))
 
 	  (pgqa-deparse-string state "ON" indent)
 
 	  (pgqa-dump (oref node qual) state
 		     (if pgqa-multiline-query (1+ indent) indent))))
 
-    (if (slot-boundp node 'alias)
-	(pgqa-dump (oref node alias) state indent))
+    ;; (if (slot-boundp node 'alias)
+    ;; 	(pgqa-dump (oref node alias) state indent))
     )
   (pgqa-dump-end node state))
 
@@ -466,15 +626,6 @@ indented."
 ;; TODO Consider custom variable that controls whether parentheses are on the
 ;; same lines the query starts and ends respectively.
 (defun pgqa-dump-from-list-query (query state indent)
-  ;; XXX Can we do anything batter than breaking the line if either or
-  ;; pgqa-join-newline or pgqa-multiline-join (or both) are nil?
-  (if (and (null (oref state line-empty)) pgqa-multiline-query)
-      (progn
-	(oset state next-space 0)
-	(pgqa-deparse-newline state indent)))
-
-  (pgqa-deparse-string state "(" indent)
-
   (let ((state-loc state))
     (if pgqa-multiline-query
 	;; Use a separate state to print out query.
@@ -496,7 +647,6 @@ indented."
 	  (oset state buffer-pos (oref state-loc buffer-pos)))))
 
   (oset state next-space 0)
-  (pgqa-deparse-string state ")" indent)
 )
 
 (defmethod pgqa-dump ((node pgqa-from-list-entry-alias) state indent)

@@ -15,9 +15,11 @@ WHERE   x = y OR j = (k - 1) * - (2 * x) / .5
 SELECT  i, i, j + k, l, m
 FROM    x,
         a
-        LEFT JOIN b ON true,
+        LEFT JOIN
+        b ON true,
         y
-        JOIN c ON j <> x
+        JOIN
+        c ON j <> x
 WHERE   x = y OR j = (k - 1) * - (2 * x) / .5
 
 SELECT  i, i,
@@ -27,9 +29,11 @@ SELECT  i, i,
         l, m
 FROM    x,
         a
-        LEFT JOIN b ON true,
+        LEFT JOIN
+        b ON true,
         y
-        JOIN c ON
+        JOIN
+        c ON
                         j
                 <>
                         x
@@ -60,9 +64,11 @@ SELECT
 FROM
         x,
         a
-        LEFT JOIN b ON true,
+        LEFT JOIN
+        b ON true,
         y
-        JOIN c ON j <> x
+        JOIN
+        c ON j <> x
 WHERE
         x = y OR j = (k - 1) * - (2 * x) / .5
 
@@ -75,9 +81,11 @@ SELECT
 FROM
         x,
         a
-        LEFT JOIN b ON true,
+        LEFT JOIN
+        b ON true,
         y
-        JOIN c ON
+        JOIN
+        c ON
                         j
                 <>
                         x
@@ -112,9 +120,11 @@ SELECT
 FROM
     x,
     a
-    LEFT JOIN b ON true,
+    LEFT JOIN
+    b ON true,
     y
-    JOIN c ON
+    JOIN
+    c ON
             j
         <>
             x
@@ -144,11 +154,11 @@ SELECT  i, i, j + k,
         l, m
 FROM    x,
         a
-        LEFT JOIN b
-        ON true,
+        LEFT JOIN
+        b ON true,
         y
-        JOIN c ON j
-                <> x
+        JOIN
+        c ON j <> x
 WHERE   x = y OR j =
         (k - 1) * -
         (2 * x) / .5
@@ -162,9 +172,11 @@ SELECT
 FROM
         x,
         a
-        LEFT JOIN b ON true,
+        LEFT JOIN
+        b ON true,
         y
-        JOIN c ON j <> x
+        JOIN
+        c ON j <> x
 WHERE
         x = y OR j = (k - 1) * - (2 * x) / .5
 
@@ -179,9 +191,11 @@ SELECT
 FROM
         x,
         a
-        LEFT JOIN b ON true,
+        LEFT JOIN
+        b ON true,
         y
-        JOIN c ON
+        JOIN
+        c ON
                         j
                 <>
                         x

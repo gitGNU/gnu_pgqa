@@ -20,7 +20,8 @@ INPUT_DIR = ./test/input/
 OUTPUT_DIR = ./test/output/
 CHECK_DIR = ./test/expected/
 
-TESTS_FORMAT = format_01 format_02 format_03 format_04 format_05 format_06
+TESTS_FORMAT = format_01 format_02 format_03 format_04 format_05 format_06\
+format_07 format_08 format_09
 
 .PHONY: test
 test:

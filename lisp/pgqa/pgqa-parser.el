@@ -40,8 +40,6 @@
   "Detect and create punctuation token, which possibly consists of multiple
 characters."
   "\\(\\s.\\|\\s$\\|\\s'\\)" 'punctuation
-  ;; (print (format "%s, %s" (match-beginning 0) (match-end 0)))
-  ;; (print (point))
   (let ((beginning (match-beginning 0))
 	(end (match-end 0))
 	(width-max 0))
@@ -751,6 +749,19 @@ whichever is available."
 	       )
 	      )
 
+	     (join-expr
+	      ((from-list-entry join-op from-list-entry ON expr)
+	       (make-instance 'pgqa-from-list-entry :args (list $1 $3)
+			      :kind $2
+			      :qual $5
+			      :region (pgqa-union-regions $region1 $1
+							  $region5 $5))
+	       )
+
+	      ((?( join-expr ?))
+	       $2)
+	      )
+
 	     (join-op
 	      ((JOIN)
 	       ;; See the 'kind slot of pgqa-from-list-entry class.
@@ -783,12 +794,15 @@ whichever is available."
 	      )
 
 	     (from-list-entry
-	      ((from-list-entry join-op from-list-entry ON expr)
-	       (make-instance 'pgqa-from-list-entry :args (list $1 $3)
-			      :kind $2
-			      :qual $5
-			      :region (pgqa-union-regions $region1 $1
-							  $region5 $5))
+	      ((join-expr)
+	       $1)
+
+	      ((?( join-expr ?) from-list-entry-alias)
+	       (let ((j $2))
+		 (oset j alias $4)
+		 (oset j region
+		       (pgqa-union-regions $region1 $1 $region2 $4))
+		 j)
 	       )
 
 	      ((sql-object)
