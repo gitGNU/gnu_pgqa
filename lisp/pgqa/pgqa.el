@@ -121,20 +121,16 @@ variables are set."
 (defun pgqa-delete-query-gui ()
   "Delete overlays and make markers available for garbage collection."
 
-  (if pgqa-query-overlays
-      (progn
-	(dolist (o pgqa-query-overlays)
-	  (delete-overlay o))
-	(setq pgqa-query-overlays nil))
-      )
+  (when pgqa-query-overlays
+    (dolist (o pgqa-query-overlays)
+      (delete-overlay o))
+    (setq pgqa-query-overlays nil))
 
-  (if pgqa-query-markers
-      (progn
-	(dolist (m pgqa-query-markers)
-	  (set-marker m nil))
-	(setq pgqa-query-markers nil))
-      )
-    )
+  (when pgqa-query-markers
+    (dolist (m pgqa-query-markers)
+      (set-marker m nil))
+    (setq pgqa-query-markers nil))
+  )
 
 (defun pgqa-set-query-faces (query)
   "Add faces to query nodes."

@@ -1065,17 +1065,16 @@ it's replaced."
   (setq pgqa-parse-error nil)
 
   ;; Do cleaup if this is not the first parsing.
-  (if pgqa-query-tree
-      (progn
-	;; User might explicitly reject the GUI after having created it
-	;; earlier, so text-only does not matter here.
-	(pgqa-reset-query-faces pgqa-query-tree)
+  (when pgqa-query-tree
+    ;; User might explicitly reject the GUI after having created it earlier,
+    ;; so text-only does not matter here.
+    (pgqa-reset-query-faces pgqa-query-tree)
 
-	;; Always delete the GUI, to avoid memory leakage (especially with
-	;; respect to markers). Also regardless text-only.
-	(pgqa-delete-query-gui)
+    ;; Always delete the GUI, to avoid memory leakage (especially with respect
+    ;; to markers). Also regardless text-only.
+    (pgqa-delete-query-gui)
 
-	(setq pgqa-query-tree nil)))
+    (setq pgqa-query-tree nil))
 
   (if (or (null pgqa-automaton) pgqa-parser-always-init
 	  noninteractive)
@@ -1105,34 +1104,33 @@ it's replaced."
 		      'pgqa-parse-message 'input))
 
   ;; Only update the existing tree if parsing did complete.
-  (if (null pgqa-parse-error)
-      ;; TODO Reconsider placing of the atomic-change-group form so they are
-      ;; not nested.
-      ;;
-      ;;(atomic-change-group
-      (progn
-	(if (null text-only)
-	    (progn
-	      (pgqa-setup-query-gui result nil)
-	      (pgqa-set-query-faces result))
-	  ;; Except for batch mode, the query should always have the markers
-	  ;; set. This is important so that we know at which position
-	  ;; deparsing should start.
-	  (if (null noninteractive)
-	      (let* ((reg-vec (oref result region))
-		     (reg-start (elt reg-vec 0))
-		     (reg-end (elt reg-vec 1))
-		     (m-start (make-marker))
-		     (m-end (make-marker)))
-		;; TODO Consider reusing the code we already have in
-		;; pgqa-setup-node-gui.
-		(set-marker m-start reg-start)
-		(set-marker m-end reg-end)
-		(set-marker-insertion-type m-start t)
-		(set-marker-insertion-type m-end nil)
-		(oset result markers (vector m-start m-end))))
-	  )
-	(setq pgqa-query-tree result)))
+  (when (null pgqa-parse-error)
+    ;; TODO Reconsider placing of the atomic-change-group form so they are not
+    ;; nested.
+    ;;
+    ;;(atomic-change-group
+    (if (null text-only)
+	(progn
+	  (pgqa-setup-query-gui result nil)
+	  (pgqa-set-query-faces result))
+      ;; Except for batch mode, the query should always have the markers
+      ;; set. This is important so that we know at which position deparsing
+      ;; should start.
+      (if (null noninteractive)
+	  (let* ((reg-vec (oref result region))
+		 (reg-start (elt reg-vec 0))
+		 (reg-end (elt reg-vec 1))
+		 (m-start (make-marker))
+		 (m-end (make-marker)))
+	    ;; TODO Consider reusing the code we already have in
+	    ;; pgqa-setup-node-gui.
+	    (set-marker m-start reg-start)
+	    (set-marker m-end reg-end)
+	    (set-marker-insertion-type m-start t)
+	    (set-marker-insertion-type m-end nil)
+	    (oset result markers (vector m-start m-end))))
+      )
+    (setq pgqa-query-tree result))
   )
 
 (defun pgqa-deparse (&optional indent)
@@ -1287,21 +1285,19 @@ in front of each line."
 	(goto-char start)
 	(insert (oref state result))
 
-	(if (null text-only)
-	    (progn
-	      ;; Add markers and overlays. (Deletion performed unconditionally
-	      ;; above as we have no information if the existing buffer
-	      ;; contents contained those objects.)
-	      ;;
-	      ;; The initial whitespace is not to be included in the node
-	      ;; markers. (That whitespace would be too hard to skip during
-	      ;; deparsing.)
-	      (pgqa-setup-query-gui pgqa-query-tree t)
+	(when (null text-only)
+	  ;; Add markers and overlays. (Deletion performed unconditionally
+	  ;; above as we have no information if the existing buffer contents
+	  ;; contained those objects.)
+	  ;;
+	  ;; The initial whitespace is not to be included in the node
+	  ;; markers. (That whitespace would be too hard to skip during
+	  ;; deparsing.)
+	  (pgqa-setup-query-gui pgqa-query-tree t)
 
-	      ;; Add faces. (Cleanup not needed -- the query string was
-	      ;; created from scratch.)
-	      (pgqa-set-query-faces pgqa-query-tree))
-	  )
+	  ;; Add faces. (Cleanup not needed -- the query string was created
+	  ;; from scratch.)
+	  (pgqa-set-query-faces pgqa-query-tree))
 	)
       )
     )

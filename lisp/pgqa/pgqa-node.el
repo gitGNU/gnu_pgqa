@@ -55,14 +55,12 @@
 	 (o))
 
     ;; If the region might start with a whitespace, skip it (the whitespace).
-    (if context
-	(progn
-	  (goto-char reg-start)
-	  (while (and (looking-at "\\s-\\|\$")
-		      (< reg-start (point-max)))
-	    (progn
-	      (setq reg-start (1+ reg-start))
-	      (goto-char reg-start)))))
+    (when context
+      (goto-char reg-start)
+      (while (and (looking-at "\\s-\\|\$")
+		  (< reg-start (point-max)))
+	(setq reg-start (1+ reg-start))
+	(goto-char reg-start)))
 
     (set-marker m-start reg-start)
     (set-marker m-end reg-end)
