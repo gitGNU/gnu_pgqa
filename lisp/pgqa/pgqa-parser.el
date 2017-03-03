@@ -270,7 +270,7 @@ whichever is available."
 	  (pgqa-get-nonterm-region-pos region node nil))))
 
 (defun pgqa-init-parser ()
-  (setq pgqa-keyword-hash (makehash 'equal))
+  (setq pgqa-keyword-hash (make-hash-table :test 'equal))
   (let ((result pgqa-keyword-hash))
     (dolist (i pgqa-keyword-symbols result)
       ;; String is the key so we can lookup token values here, symbol is the
@@ -321,7 +321,7 @@ whichever is available."
 
     ;; Initialize the hash in which tokenizer will look-up the terminal
     ;; symbols.
-    (setq pgqa-terminal-hash (makehash 'equal))
+    (setq pgqa-terminal-hash (make-hash-table :test 'equal))
     (let ((result pgqa-terminal-hash))
       ;; Process the operators by groups.
       (dolist (group pgqa-operator-groups result)
