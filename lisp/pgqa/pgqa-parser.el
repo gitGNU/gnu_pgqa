@@ -998,7 +998,7 @@ whichever is available."
 		  ;; kind, or removal of these conditions altogether.
 		  ((and (or (eq kind 'punctuation) (eq kind 'symbol)
 			    (eq kind 'open-paren) (eq kind 'close-paren))
-			(setq key (gethash value pgqa-terminal-hash nil)))
+			(setq key (gethash (upcase value) pgqa-terminal-hash nil)))
 		   key)
 
 		  ((eq kind 'number)
