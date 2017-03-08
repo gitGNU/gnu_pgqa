@@ -216,12 +216,6 @@ variables are set."
 ;; other elisp modules.
 (defvar pgqa-keywors-higlight-only
   '(
-   ;; We (mis)use this list to highlight keywords that represent
-   ;; operators. Since there are only few (and PG user should not be able to
-   ;; add more), special list does not seem to make sense. XXX We might want
-   ;; to remove these anyway if we decide to use special face for operators.
-   AND IS ISNULL OR NOTNULL
-
    BEGIN COMMENT CREATE DECLARE ELSE END EXCEPTION FUNCTION IF
    LANGUAGE RETURN RETURNS TABLE THEN))
 
