@@ -898,7 +898,28 @@ whichever is available."
 
 	     (sort-group-list
 	      ((expr-list)
-	       $1
+	       ;; Turn the list of operators into a list of target entries so
+	       ;; it's handled correctly by pgqa-dump (Here we refer to
+	       ;; pgqa-clause-item-newline, which is currently applied only to
+	       ;; instances of pgqa-target-entry and pgqa-from-list-entry
+	       ;; class.)
+	       ;;
+	       ;; We could use target-list rule instead of expr-list, but that
+	       ;; would let the parser accept invalid syntax and make
+	       ;; consequent checks harder.
+	       (let ((op-args (oref $1 args))
+		     (args-new))
+		 (dolist (arg op-args)
+		   (let ((te))
+		     (setq te
+			   (make-instance 'pgqa-target-entry
+					  :expr arg
+					  :region (oref arg region)))
+		     (setq args-new (append args-new (list te)))))
+
+		 ;; Return the comma operator with the argument list replaced.
+		 (oset $1 args args-new)
+		 $1)
 	       )
 	      )
 	     )
