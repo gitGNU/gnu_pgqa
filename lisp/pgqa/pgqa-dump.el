@@ -660,9 +660,9 @@ indented."
   (let* ((indent-clause)
 	 (expr-tmp)
 	 (kwd)
-	 (args (oref node args))
 	 ;; See group-expr rule in pgqa-parser.el.
-	 (comma (car args)))
+	 (comma (oref node args))
+	 (op (car comma)))
 
     (setq kwd
 	  (if (oref node is-group)
@@ -679,7 +679,7 @@ indented."
     (if pgqa-clause-newline
 	(pgqa-deparse-newline state indent-clause))
 
-    (pgqa-dump comma state indent-clause))
+    (pgqa-dump op state indent-clause))
   (pgqa-dump-end node state))
 
 (defmethod pgqa-dump ((node pgqa-func-call) state indent)
