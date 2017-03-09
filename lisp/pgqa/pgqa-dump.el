@@ -614,7 +614,7 @@ indented."
 	  (pgqa-deparse-string state "ON" indent)
 
 	  (pgqa-dump (oref node qual) state
-		     (if pgqa-multiline-query (1+ indent) indent))))
+		     (if pgqa-multiline-join (1+ indent) indent))))
 
     ;; (if (slot-boundp node 'alias)
     ;; 	(pgqa-dump (oref node alias) state indent))
