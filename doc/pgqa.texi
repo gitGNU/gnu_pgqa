@@ -110,6 +110,7 @@ line.
 @menu
 * Interactive Mode::
 * Batch Mode::
+* Customization::
 @end menu
 
 @node Interactive Mode
@@ -177,4 +178,212 @@ emacs -batch --insert query.sql -l pgqa.el -f pgqa-format-query-batch
 
 @noindent
 The formatted query should be sent to the standard output.
+
+@node Customization
+@section Customization
+
+@noindent
+This section summarizes settings that affect SQL query formatting. You
+can use functions @kbd{M-x customize}, @kbd{M-x customize-option} or
+@kbd{M-x customize-group} to change these settings. They all belong to
+@code{pgqa} group.
+
+@noindent
+@code{pgqa-multiline-query} setting can effectively disable formatting
+if it's value is @code{nil}. In that case line is only broken if the
+column of the next character is greater than the value of
+@code{fill-column} setting.
+
+@noindent
+For example, if @code{fill-column} is set to 40 (just to demonstrate
+how lines are broken, without using too complex query),
+@code{pgqa-format-query} will produce this:
+
+@example
+SELECT p.name, l.name, r.version, r.date
+FROM projects AS p JOIN licenses AS l ON
+l.id = p.license_id JOIN releases AS r
+ON r.project_id = p.id WHERE r.date <=
+'2012-06-30' AND p.name LIKE '%GNU%'
+ORDER BY r.date, p.name;
+@end example
+
+@noindent
+(Note that all the following formatting settings must be set to
+@code{nil} in this case, otherwise the formatting will result in error
+message.)
+
+@noindent
+If you set @code{pgqa-multiline-query} option, each query ``clause
+keyword'' (@code{SELECT}, @code{FROM}, etc.) of the formatted query
+will start on a new line:
+
+@example
+@group
+SELECT      p.name, l.name, r.version,
+            r.date
+FROM        projects AS p JOIN licenses
+            AS l ON l.id = p.license_id
+            JOIN releases AS r ON
+            r.project_id = p.id
+WHERE       r.date <= '2012-06-30' AND
+            p.name LIKE '%GNU%'
+ORDER BY    r.date, p.name;
+@end group
+@end example
+
+@noindent
+@code{pgqa-clause-newline} can be set in addition to ensure that the
+actual ``top-level clause'' will start on a new line. The clause will
+be given extra indentation relative to the ``clause keyword''. For
+example, if the value of @code{tab-width} setting is equal to 4, the
+query will looke like this:
+
+@example
+@group
+SELECT
+    p.name, l.name, r.version, r.date
+FROM
+    projects AS p JOIN licenses AS l ON l.id =
+    p.license_id JOIN releases AS r ON
+    r.project_id = p.id
+WHERE
+    r.date <= '2012-06-30' AND p.name LIKE '%GNU%'
+ORDER BY
+    r.date, p.name;
+@end group
+@end example
+
+@noindent
+@code{pgqa-clause-newline} requires @code{pgqa-multiline-query} to be
+set.
+
+@page
+@noindent
+Furthermore, @code{pgqa-clause-item-newline} setting ensures that
+comma in the ``top-level'' clause is always followed by a new line:
+
+@example
+@group
+SELECT
+    p.name,
+    l.name,
+    r.version,
+    r.date
+FROM
+    projects AS p JOIN licenses AS l ON l.id =
+    p.license_id JOIN releases AS r ON
+    r.project_id = p.id
+WHERE
+    r.date <= '2012-06-30' AND p.name LIKE '%GNU%'
+ORDER BY
+    r.date,
+    p.name;
+@end group
+@end example
+
+@noindent
+@code{pgqa-clause-item-newline} requires @code{pgqa-clause-newline} to
+be set.
+
+@noindent
+@code{pgqa-multiline-join} setting ensures that @code{JOIN} keyword is
+always printed on a new line, following the appropriate indentation:
+
+@example
+@group
+SELECT
+    p.name,
+    l.name,
+    r.version,
+    r.date
+FROM
+    projects AS p
+    JOIN licenses AS l ON l.id = p.license_id
+    JOIN releases AS r ON r.project_id = p.id
+WHERE
+    r.date <= '2012-06-30' AND p.name LIKE '%GNU%'
+ORDER BY
+    r.date,
+    p.name;
+@end group
+@end example
+
+@noindent
+@code{pgqa-multiline-join} requires @code{pgqa-multiline-query} to be
+set.
+
+@page
+@noindent
+If @code{pgqa-join-newline} is enabled, line delimiter and indentation
+are also printed out in front of the right side of the join:
+
+@example
+@group
+SELECT
+    p.name,
+    l.name,
+    r.version,
+    r.date
+FROM
+    projects AS p
+    JOIN
+    licenses AS l ON l.id = p.license_id
+    JOIN
+    releases AS r ON r.project_id = p.id
+WHERE
+    r.date <= '2012-06-30' AND p.name LIKE '%GNU%'
+ORDER BY
+    r.date,
+    p.name;
+@end group
+@end example
+
+@noindent
+@code{pgqa-join-newline} requires @code{pgqa-multiline-join} to be
+set.
+
+@page
+@noindent
+@code{pgqa-multiline-operator} setting can help you understand complex
+expression. If this is set, operator expressions are printed out in
+structured way --- exactly the way PGQA understands them:
+
+@example
+@group
+SELECT
+    p.name,
+    l.name,
+    r.version,
+    r.date
+FROM
+    projects AS p
+    JOIN
+    licenses AS l ON
+            l.id
+        =
+            p.license_id
+    JOIN
+    releases AS r ON
+            r.project_id
+        =
+            p.id
+WHERE
+            r.date
+        <=
+            '2012-06-30'
+    AND
+            p.name
+        LIKE
+            '%GNU%'
+ORDER BY
+    r.date,
+    p.name;
+@end group
+@end example
+
+@noindent
+@code{pgqa-multiline-operator} requires @code{pgqa-multiline-join}
+to be set.
+
 @bye
