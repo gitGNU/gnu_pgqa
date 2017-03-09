@@ -85,15 +85,16 @@ characters."
 (defvar pgqa-terminal-hash nil)
 
 ;; Precedence constants. Do not use the numbers directly.
-(defconst pgqa-precedence-uminus	7)
-(defconst pgqa-precedence-times		6)
-(defconst pgqa-precedence-add		5)
-(defconst pgqa-precedence-cmp		4)
-(defconst pgqa-precedence-test		3)
-(defconst pgqa-precedence-not		2)
-(defconst pgqa-precedence-and		1)
-(defconst pgqa-precedence-or		0)
-(defconst pgqa-precedence-comma		-1)
+(defconst pgqa-precedence-uminus        8)
+(defconst pgqa-precedence-times         7)
+(defconst pgqa-precedence-add           6)
+(defconst pgqa-precedence-like          5)
+(defconst pgqa-precedence-cmp           4)
+(defconst pgqa-precedence-test          3)
+(defconst pgqa-precedence-not           2)
+(defconst pgqa-precedence-and           1)
+(defconst pgqa-precedence-or            0)
+(defconst pgqa-precedence-comma         -1)
 
 ;; As the grammar definition does not accept terminals in the form of string,
 ;; a symbol must exist to represent each terminal. We can't use hard-wired
@@ -112,23 +113,27 @@ characters."
   '(OPGROUP-1 pgqa-precedence-times "/"))
 
 (defvar pgqa-operator-group-2
-  '(OPGROUP-2 pgqa-precedence-cmp ">" "<" "=" "<=" ">=" "<>"))
+  '(OPGROUP-2 pgqa-precedence-like "LIKE"))
 
 (defvar pgqa-operator-group-3
-  '(OPGROUP-3 pgqa-precedence-test "IS" "ISNULL" "NOTNULL"))
+  '(OPGROUP-3 pgqa-precedence-cmp ">" "<" "=" "<=" ">=" "<>"))
 
 (defvar pgqa-operator-group-4
-  '(OPGROUP-4 pgqa-precedence-not "NOT"))
+  '(OPGROUP-4 pgqa-precedence-test "IS" "ISNULL" "NOTNULL"))
 
 (defvar pgqa-operator-group-5
-  '(OPGROUP-5 pgqa-precedence-and "AND"))
+  '(OPGROUP-5 pgqa-precedence-not "NOT"))
 
 (defvar pgqa-operator-group-6
-  '(OPGROUP-6 pgqa-precedence-or "OR"))
+  '(OPGROUP-6 pgqa-precedence-and "AND"))
+
+(defvar pgqa-operator-group-7
+  '(OPGROUP-7 pgqa-precedence-or "OR"))
 
 (defvar pgqa-operator-groups
   (list pgqa-operator-group-1 pgqa-operator-group-2 pgqa-operator-group-3
-	pgqa-operator-group-4 pgqa-operator-group-5 pgqa-operator-group-6))
+	pgqa-operator-group-4 pgqa-operator-group-5 pgqa-operator-group-6
+	pgqa-operator-group-7))
 
 ;; Single-character terminals not contained explicitly in any group above.
 ;; These can also be used as a symbol in the grammar definition.
@@ -354,25 +359,30 @@ whichever is available."
 	   (append '(left)
 		   (pgqa-operator-group-symbols
 		    ;; OR
-		    pgqa-operator-group-6 pgqa-terminal-hash))
+		    pgqa-operator-group-7 pgqa-terminal-hash))
 
 	   (append '(left)
 		   ;; AND
 		   (pgqa-operator-group-symbols
-		    pgqa-operator-group-5 pgqa-terminal-hash))
+		    pgqa-operator-group-6 pgqa-terminal-hash))
 
 	   (append '(right)
 		   ;; NOT
 		   (pgqa-operator-group-symbols
-		    pgqa-operator-group-4 pgqa-terminal-hash))
+		    pgqa-operator-group-5 pgqa-terminal-hash))
 
 	   (append '(nonassoc)
 		   ;; IS, ISNULL, NOTNULL
 		   (pgqa-operator-group-symbols
-		    pgqa-operator-group-3 pgqa-terminal-hash))
+		    pgqa-operator-group-4 pgqa-terminal-hash))
 
 	   (append '(nonassoc)
 		   ;; >, <, etc.
+		   (pgqa-operator-group-symbols
+		    pgqa-operator-group-3 pgqa-terminal-hash))
+
+	   (append '(nonassoc)
+		   ;; LIKE, etc.
 		   (pgqa-operator-group-symbols
 		    pgqa-operator-group-2 pgqa-terminal-hash))
 
@@ -402,9 +412,9 @@ whichever is available."
     ;; The rules are added to the beginning of the list, so high precedences
     ;; first.
     (setq rule-sublist-1
-	  (pgqa-create-operator-rules
-	   pgqa-operator-group-1 rule-sublist-1 pgqa-terminal-hash
-	   'pgqa-create-binop-expr-rule))
+          (pgqa-create-operator-rules
+           pgqa-operator-group-1 rule-sublist-1 pgqa-terminal-hash
+           'pgqa-create-binop-expr-rule))
 
     ;; Asterisk can also be used as wildcard in object names, so handle it
     ;; separate from the pgqa-operator-group-1 group. However the precedence
@@ -421,32 +431,38 @@ whichever is available."
 
     (setq rule-sublist-1
 	  (pgqa-create-operator-rules
-	   ;; >, <, etc.
+	   ;; LIKE, ...
 	   pgqa-operator-group-2 rule-sublist-1 pgqa-terminal-hash
 	   'pgqa-create-binop-expr-rule))
 
     (setq rule-sublist-1
-    	  (pgqa-create-operator-rules
-	   ;; IS, ISNULL, NOTNULL
-    	   pgqa-operator-group-3 rule-sublist-1 pgqa-terminal-hash
-	   'pgqa-create-postfix-unop-expr-rule))
+	  (pgqa-create-operator-rules
+	   ;; >, <, etc.
+	   pgqa-operator-group-3 rule-sublist-1 pgqa-terminal-hash
+	   'pgqa-create-binop-expr-rule))
 
     (setq rule-sublist-1
-    	  (pgqa-create-operator-rules
-	   ;; NOT
-    	   pgqa-operator-group-4 rule-sublist-1 pgqa-terminal-hash
-	   'pgqa-create-prefix-unop-expr-rule))
+          (pgqa-create-operator-rules
+           ;; IS, ISNULL, NOTNULL
+           pgqa-operator-group-4 rule-sublist-1 pgqa-terminal-hash
+           'pgqa-create-postfix-unop-expr-rule))
+
+    (setq rule-sublist-1
+          (pgqa-create-operator-rules
+           ;; NOT
+           pgqa-operator-group-5 rule-sublist-1 pgqa-terminal-hash
+           'pgqa-create-prefix-unop-expr-rule))
 
     (setq rule-sublist-1
 	  (pgqa-create-operator-rules
 	   ;; AND
-	   pgqa-operator-group-5 rule-sublist-1 pgqa-terminal-hash
+	   pgqa-operator-group-6 rule-sublist-1 pgqa-terminal-hash
 	   'pgqa-create-binop-expr-rule))
 
     (setq rule-sublist-1
 	  (pgqa-create-operator-rules
 	   ;; OR
-	   pgqa-operator-group-6 rule-sublist-1 pgqa-terminal-hash
+	   pgqa-operator-group-7 rule-sublist-1 pgqa-terminal-hash
 	   'pgqa-create-binop-expr-rule))
 
     ;; TODO Create a group for these as well, and possibly replace
