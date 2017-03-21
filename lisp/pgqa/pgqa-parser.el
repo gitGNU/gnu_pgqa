@@ -278,10 +278,16 @@ whichever is available."
   (setq pgqa-keyword-hash (make-hash-table :test 'equal))
   (let ((result pgqa-keyword-hash))
     (dolist (i pgqa-keyword-symbols result)
-      ;; String is the key so we can lookup token values here, symbol is the
-      ;; value because parser expects symbols.
-      (puthash (format "%s" i) i result)
-      )
+      (let ((s (format "%s" i)))
+
+	;; Althouhgh Wisent would probably complain too, it's simple enought
+	;; to check for duplicate keywords here.
+	(if (gethash s result)
+	    (error (format "Duplicate keyword: %s" s)))
+
+	;; String is the key so we can lookup token values here, symbol is the
+	;; value because parser expects symbols.
+	(puthash s i result)))
     )
 
   ;; Initialize pgqa-punctuation-operators-multi, ie collect all
@@ -340,6 +346,12 @@ whichever is available."
 	    ;; Create unique symbol per operator.
 	    (setq sym-str (format "%s_%d" (symbol-name gsym) i))
 	    (setq sym (make-symbol sym-str))
+
+	    ;; It shouldn't be difficult for user to add a custom operator, so
+	    ;; guard against duplicate entries.
+	    (if (gethash op result)
+		(error (format "Duplicate operator: %s" op)))
+
 	    (puthash op sym result)
 	    ;; Also add it to the list of terminals.
 	    (push sym terminals)
