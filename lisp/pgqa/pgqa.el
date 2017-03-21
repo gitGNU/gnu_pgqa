@@ -214,7 +214,7 @@ variables are set."
 ;;
 ;; TODO Consider if strings are safer than symbols, in terms of conflict with
 ;; other elisp modules.
-(defvar pgqa-keywors-higlight-only
+(defvar pgqa-keywords-highlight-only
   '(
    BEGIN COMMENT CREATE DECLARE ELSE END EXCEPTION FUNCTION IF
    LANGUAGE RETURN RETURNS TABLE THEN))
@@ -224,7 +224,7 @@ variables are set."
   (list (concat "\\<"
 		(mapconcat 'symbol-name
 			   (append pgqa-keyword-symbols
-				   pgqa-keywors-higlight-only)
+				   pgqa-keywords-highlight-only)
 			   "\\>\\|\\<")
 		"\\>")))
 
