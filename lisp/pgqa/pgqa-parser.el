@@ -31,30 +31,31 @@
 
 ;; Instead of semantic-lex-punctuation analyzer we use
 ;; semantic-lex-punctuation-multi, to cover multi-character operators.
-;;
-;; pgqa-punctuation-operators-multi is the list of mulit-character operators
-;; consisting of punctuation characters. It's needed by this special analyzer.
-(defvar pgqa-punctuation-operators-multi nil)
-
 (define-lex-regex-analyzer semantic-lex-punctuation-multi
   "Detect and create punctuation token, which possibly consists of multiple
 characters."
   "\\(\\s.\\|\\s$\\|\\s'\\)" 'punctuation
   (let ((beginning (match-beginning 0))
 	(end (match-end 0))
+	(is-dot)
 	(width-max 0))
-    ;; Find the longest matching multi-character operator.
-    ;;
-    ;; TODO Consider sorting of pgqa-punctuation-operators-multi by length
-    ;; during initialization and terminating the search when the first match
-    ;; is found.
-    (dolist (op pgqa-punctuation-operators-multi)
-      (let ((width (string-width op)))
-	(if (and (looking-at op) (> width width-max))
-	    (setq width-max width))))
 
-    (if (> width-max 1)
-	(setq end (+ end (1- width-max))))
+    (save-excursion
+      (goto-char beginning)
+      (setq is-dot (looking-at "\\.")))
+
+    ;; Find the end of the (supposed) operator, but do not consider a dot to
+    ;; be part of any operator.
+    (when (null is-dot)
+      (setq end (re-search-forward "\\(\\s.\\|*\\)*"
+				   (+ (point) pgqa-max-operator-length)))
+
+      ;; Treat the special case of a colon or a comma following an asterisk in
+      ;; the role of a column wildcard.
+      (save-excursion
+	(goto-char (1- end))
+	(if (and (looking-at "\\(;\\|,\\)") (> (- end beginning) 1))
+	  (setq end (1- end)))))
 
     (semantic-lex-push-token
      (semantic-lex-token
@@ -85,9 +86,10 @@ characters."
 (defvar pgqa-terminal-hash nil)
 
 ;; Precedence constants. Do not use the numbers directly.
-(defconst pgqa-precedence-uminus        8)
-(defconst pgqa-precedence-times         7)
-(defconst pgqa-precedence-add           6)
+(defconst pgqa-precedence-uminus        9)
+(defconst pgqa-precedence-times         8)
+(defconst pgqa-precedence-add           7)
+(defconst pgqa-precedence-other         6)
 (defconst pgqa-precedence-like          5)
 (defconst pgqa-precedence-cmp           4)
 (defconst pgqa-precedence-test          3)
@@ -112,28 +114,112 @@ characters."
   ;; use as a wildcard. See all references to this group.
   '(OPGROUP-1 pgqa-precedence-times "/"))
 
+;; Operators defined in the pg_operator catalog are treated equally when
+;; terminal symbols are concerned (they have the same precedence), so they all
+;; have the same OPGROUP-CAT symbol prefix. However we need them separate when
+;; creating grammar rules.
+;;
+;; First, the binary operators. Use this query to retrieve the list.
+;;
+;; SELECT  string_agg(DISTINCT '"' || oprname || '"', ' ')
+;; FROM    pg_operator
+;; WHERE   oprleft > 0 AND oprright > 0 AND oid < 16384
+;; 	AND oprname NOT IN ('>', '<', '=', '<=', '>=', '<>', '/', '*',
+;; 	'+', '-');
+;;
 (defvar pgqa-operator-group-2
-  '(OPGROUP-2 pgqa-precedence-like "LIKE"))
+  '(OPGROUP-CAT
+    pgqa-precedence-other
+    "^" "~~" "~~*" "~<~" "~<=~" "~=" "~>~" "~>=~" "~" "~*" "<^" "<<=" "<<|"
+    "<<" "<->" "<?>" "<@" "<#>" ">^" ">>=" ">>" "|>>" "||" "|" "|&>" "->>"
+    "->" "-|-" "!~~" "!~~*" "!~" "!~*" "?||" "?|" "?-|" "?-" "?" "?&" "?#"
+    "@>" "@" "@@" "@@@" "*<=" "*<>" "*<" "*=" "*>=" "*>" "&<|" "&<" "&>" "&"
+    "&&" "#<=" "#<>" "#<" "#=" "#>=" "#>>" "#>" "#-" "#" "##" "%"
+))
 
+;; pg_operator - unary prefix.
+;;
+;; SELECT  string_agg(DISTINCT '"' || oprname || '"', ' ')
+;; FROM    pg_operator
+;; WHERE   oprleft = 0 AND oprright > 0 AND oid < 16384
+;; 	AND oprname NOT IN ('>', '<', '=', '<=', '>=', '<>', '/', '*',
+;; 	'+', '-');
 (defvar pgqa-operator-group-3
-  '(OPGROUP-3 pgqa-precedence-cmp ">" "<" "=" "<=" ">=" "<>"))
+  '(OPGROUP-CAT
+    pgqa-precedence-other
+    "~" "||/" "|/" "|" "!!" "?|" "?-" "@-@" "@" "@@" "#"))
 
+;; pg_operator - unary postfix.
+;;
+;; SELECT  string_agg(DISTINCT '"' || oprname || '"', ' ')
+;; FROM    pg_operator
+;; WHERE   oprleft > 0 AND oprright = 0 AND oid < 16384
+;; 	AND oprname NOT IN ('>', '<', '=', '<=', '>=', '<>', '/', '*',
+;; 	'+', '-');
 (defvar pgqa-operator-group-4
-  '(OPGROUP-4 pgqa-precedence-test "IS" "ISNULL" "NOTNULL"))
+  '(OPGROUP-CAT pgqa-precedence-other "!"))
+
+;; Construct a special group for declaration of terminals contained in the
+;; `orig' list but not contained in `excl'. This is to ensure that Wisent does
+;; not complain about "redefining precedence" of a terminal.
+;;
+;; In effect, such "ambiguous" operators will be declared as left-associative,
+;; as this is important to parse them in the "binary context". On the other
+;; hand, associativity is not important for an unary operator, but it
+;; shouldn't break things if remains left-associative due to the ambiguity.
+;;
+;; XXX Not all uses of the operator groups need the symbol, and it appears to
+;; be redundant here. Is this worth restructuring the data?
+(defun pgqa-operator-group-excl (orig excl)
+  (let ((result)
+	(orig-ops (cdr (cdr orig)))
+	(excl-ops (cdr (cdr excl))))
+
+    (dolist (i orig-ops)
+      (if (null (member i excl-ops))
+	  (push i result)))
+
+    (append
+     (list 'OPGROUP-CAT 'pgqa-precedence-other) result))
+  )
+
+;; Unique set of operators present in PG catalog (pg_operator) is useful
+;; sometimes (although the duplicates probably wouldn't be fatal).
+(defvar pgqa-operators-catalog
+  (let ((ops-cat))
+    (setq ops-cat (seq-concatenate 'list
+				   (cdr (cdr pgqa-operator-group-2))
+				   (cdr (cdr  pgqa-operator-group-3))
+				   (cdr (cdr pgqa-operator-group-4))))
+    (setq ops-cat (delete-dups ops-cat))
+    (setq ops-cat (append '(OPGROUP-CAT pgqa-precedence-other) ops-cat))))
 
 (defvar pgqa-operator-group-5
-  '(OPGROUP-5 pgqa-precedence-not "NOT"))
+  '(OPGROUP-5 pgqa-precedence-like "LIKE"))
 
 (defvar pgqa-operator-group-6
-  '(OPGROUP-6 pgqa-precedence-and "AND"))
+  '(OPGROUP-6 pgqa-precedence-cmp ">" "<" "=" "<=" ">=" "<>"))
 
 (defvar pgqa-operator-group-7
-  '(OPGROUP-7 pgqa-precedence-or "OR"))
+  '(OPGROUP-7 pgqa-precedence-test "IS" "ISNULL" "NOTNULL"))
+
+(defvar pgqa-operator-group-8
+  '(OPGROUP-8 pgqa-precedence-not "NOT"))
+
+(defvar pgqa-operator-group-9
+  '(OPGROUP-9 pgqa-precedence-and "AND"))
+
+(defvar pgqa-operator-group-10
+  '(OPGROUP-10 pgqa-precedence-or "OR"))
 
 (defvar pgqa-operator-groups
-  (list pgqa-operator-group-1 pgqa-operator-group-2 pgqa-operator-group-3
-	pgqa-operator-group-4 pgqa-operator-group-5 pgqa-operator-group-6
-	pgqa-operator-group-7))
+  (list pgqa-operator-group-1 pgqa-operators-catalog pgqa-operator-group-5
+	pgqa-operator-group-6 pgqa-operator-group-7 pgqa-operator-group-8
+	pgqa-operator-group-9 pgqa-operator-group-10))
+
+;; This is needed in semantic-lex-punctuation-multi analyzer.
+(defvar pgqa-max-operator-length 0
+  "Maximum length among non-keyword operators")
 
 ;; Single-character terminals not contained explicitly in any group above.
 ;; These can also be used as a symbol in the grammar definition.
@@ -290,17 +376,17 @@ whichever is available."
 	(puthash s i result)))
     )
 
-  ;; Initialize pgqa-punctuation-operators-multi, ie collect all
-  ;; multi-character operators consisting of punctuation characters (we assume
-  ;; that all chars are punctuation or none, so it's o.k. to test only the
-  ;; first character).
+  ;; Initialize pgqa-max-operator-length.
   (dolist (g pgqa-operator-groups)
     (let ((ops (cdr (cdr g))))
       (dolist (op ops)
-	(if (and
-	     (> (string-width op) 1)
-	     (string-match "\\s." op))
-	    (push op pgqa-punctuation-operators-multi)))))
+
+	(if (string-match "\\s." op)
+	    (setq pgqa-max-operator-length
+		  (max pgqa-max-operator-length (string-width op))))
+	)
+      )
+    )
 
   (define-lex
     simple-lex
@@ -344,17 +430,14 @@ whichever is available."
 	      (sym))
 	  (dolist (op ops result)
 	    ;; Create unique symbol per operator.
-	    (setq sym-str (format "%s_%d" (symbol-name gsym) i))
+	    (setq sym-str (format "%s_%.3d" (symbol-name gsym) i))
 	    (setq sym (make-symbol sym-str))
 
-	    ;; It shouldn't be difficult for user to add a custom operator, so
-	    ;; guard against duplicate entries.
-	    (if (gethash op result)
-		(error (format "Duplicate operator: %s" op)))
-
 	    (puthash op sym result)
+
 	    ;; Also add it to the list of terminals.
 	    (push sym terminals)
+
 	    (setq i (1+ i)))))
 
       ;; Add characters not contained in any group.
@@ -371,30 +454,55 @@ whichever is available."
 	   (append '(left)
 		   (pgqa-operator-group-symbols
 		    ;; OR
-		    pgqa-operator-group-7 pgqa-terminal-hash))
+		    pgqa-operator-group-10 pgqa-terminal-hash))
 
 	   (append '(left)
 		   ;; AND
 		   (pgqa-operator-group-symbols
-		    pgqa-operator-group-6 pgqa-terminal-hash))
+		    pgqa-operator-group-9 pgqa-terminal-hash))
 
 	   (append '(right)
 		   ;; NOT
 		   (pgqa-operator-group-symbols
-		    pgqa-operator-group-5 pgqa-terminal-hash))
+		    pgqa-operator-group-8 pgqa-terminal-hash))
 
 	   (append '(nonassoc)
 		   ;; IS, ISNULL, NOTNULL
 		   (pgqa-operator-group-symbols
-		    pgqa-operator-group-4 pgqa-terminal-hash))
+		    pgqa-operator-group-7 pgqa-terminal-hash))
 
 	   (append '(nonassoc)
 		   ;; >, <, etc.
 		   (pgqa-operator-group-symbols
-		    pgqa-operator-group-3 pgqa-terminal-hash))
+		    pgqa-operator-group-6 pgqa-terminal-hash))
 
 	   (append '(nonassoc)
 		   ;; LIKE, etc.
+		   (pgqa-operator-group-symbols
+		    pgqa-operator-group-5 pgqa-terminal-hash))
+
+	   ;; pg_operator catalog entries.
+	   ;;
+	   ;; unary postfix
+	   (append '(nonassoc)
+		   (pgqa-operator-group-symbols
+		    (pgqa-operator-group-excl
+		     pgqa-operator-group-4 pgqa-operator-group-2)
+		    pgqa-terminal-hash))
+
+	   ;; unary prefix
+	   ;;
+	   ;; If operator is both binary and unary, don't add it here
+	   ;; again. It'd only cause Wisent warnings, but would have no impact
+	   ;; on the actual parsing.
+	   (append '(nonassoc PREC-CATALOG-UN-PRE)
+		   (pgqa-operator-group-symbols
+		    (pgqa-operator-group-excl
+		     pgqa-operator-group-3 pgqa-operator-group-2)
+		    pgqa-terminal-hash))
+
+	   ;; binary
+	   (append '(left PREC-CATALOG-BIN)
 		   (pgqa-operator-group-symbols
 		    pgqa-operator-group-2 pgqa-terminal-hash))
 
@@ -424,9 +532,9 @@ whichever is available."
     ;; The rules are added to the beginning of the list, so high precedences
     ;; first.
     (setq rule-sublist-1
-          (pgqa-create-operator-rules
-           pgqa-operator-group-1 rule-sublist-1 pgqa-terminal-hash
-           'pgqa-create-binop-expr-rule))
+	  (pgqa-create-operator-rules
+	   pgqa-operator-group-1 rule-sublist-1 pgqa-terminal-hash
+	   'pgqa-create-binop-expr-rule))
 
     ;; Asterisk can also be used as wildcard in object names, so handle it
     ;; separate from the pgqa-operator-group-1 group. However the precedence
@@ -443,38 +551,56 @@ whichever is available."
 
     (setq rule-sublist-1
 	  (pgqa-create-operator-rules
-	   ;; LIKE, ...
+	   ;; pg_operator - binary.
 	   pgqa-operator-group-2 rule-sublist-1 pgqa-terminal-hash
 	   'pgqa-create-binop-expr-rule))
 
     (setq rule-sublist-1
 	  (pgqa-create-operator-rules
-	   ;; >, <, etc.
+	   ;; pg_operator - unary prefix.
 	   pgqa-operator-group-3 rule-sublist-1 pgqa-terminal-hash
+	   'pgqa-create-prefix-unop-expr-rule))
+
+    (setq rule-sublist-1
+	  (pgqa-create-operator-rules
+	   ;; pg_operator - unary postfix.
+	   pgqa-operator-group-4 rule-sublist-1 pgqa-terminal-hash
+	   'pgqa-create-postfix-unop-expr-rule))
+
+    (setq rule-sublist-1
+	  (pgqa-create-operator-rules
+	   ;; LIKE, ...
+	   pgqa-operator-group-5 rule-sublist-1 pgqa-terminal-hash
+	   'pgqa-create-binop-expr-rule))
+
+    (setq rule-sublist-1
+	  (pgqa-create-operator-rules
+	   ;; >, <, etc.
+	   pgqa-operator-group-6 rule-sublist-1 pgqa-terminal-hash
 	   'pgqa-create-binop-expr-rule))
 
     (setq rule-sublist-1
           (pgqa-create-operator-rules
            ;; IS, ISNULL, NOTNULL
-           pgqa-operator-group-4 rule-sublist-1 pgqa-terminal-hash
+           pgqa-operator-group-7 rule-sublist-1 pgqa-terminal-hash
            'pgqa-create-postfix-unop-expr-rule))
 
     (setq rule-sublist-1
           (pgqa-create-operator-rules
            ;; NOT
-           pgqa-operator-group-5 rule-sublist-1 pgqa-terminal-hash
+           pgqa-operator-group-8 rule-sublist-1 pgqa-terminal-hash
            'pgqa-create-prefix-unop-expr-rule))
 
     (setq rule-sublist-1
 	  (pgqa-create-operator-rules
 	   ;; AND
-	   pgqa-operator-group-6 rule-sublist-1 pgqa-terminal-hash
+	   pgqa-operator-group-9 rule-sublist-1 pgqa-terminal-hash
 	   'pgqa-create-binop-expr-rule))
 
     (setq rule-sublist-1
 	  (pgqa-create-operator-rules
 	   ;; OR
-	   pgqa-operator-group-7 rule-sublist-1 pgqa-terminal-hash
+	   pgqa-operator-group-10 rule-sublist-1 pgqa-terminal-hash
 	   'pgqa-create-binop-expr-rule))
 
     ;; TODO Create a group for these as well, and possibly replace
@@ -1033,7 +1159,8 @@ whichever is available."
 	  (setq pos (cdr tok))
 	  (setq start (car pos))
 	  (setq end (cdr pos))
-	  (setq value (buffer-substring-no-properties start end))
+	  (setq value
+		(buffer-substring-no-properties start end))
 	  (setq result
 		(list
 		 (cond
