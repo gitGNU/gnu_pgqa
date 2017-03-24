@@ -1252,8 +1252,7 @@ it's replaced."
 
     (setq pgqa-query-tree nil))
 
-  (if (or (null pgqa-automaton) pgqa-parser-always-init
-	  noninteractive)
+  (if (or (null pgqa-automaton) pgqa-parser-always-init)
       (pgqa-init-parser))
 
   ;; TODO Check this needs to be repeated. Currently it seems related to
