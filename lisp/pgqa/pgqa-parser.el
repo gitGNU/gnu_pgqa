@@ -1236,7 +1236,7 @@ whichever is available."
 		      (format "'%s'" op) msg))))
      pgqa-terminal-hash)
 
-    (user-error msg))
+    (user-error "%s" msg))
 )
 
 ;; TODO Consider declaring and handling the parameters like fill-paragraph
