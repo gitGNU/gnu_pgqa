@@ -217,6 +217,32 @@ characters."
 	pgqa-operator-group-6 pgqa-operator-group-7 pgqa-operator-group-8
 	pgqa-operator-group-9 pgqa-operator-group-10))
 
+;; List of all operators (only strings, no metadata from the groups above).
+(defvar pgqa-all-operators
+  (let ((result))
+    (dolist (g pgqa-operator-groups)
+      (let ((ops (cdr (cdr g))))
+	(dolist (op ops)
+	  (push op result))
+	)
+      )
+    result)
+  )
+
+;; Operators which are considered keywords.
+;;
+;; These are kept separate for the sake of highlighting: although
+;; `pgqa-operator-face' will eventually be assigned to them, highlighting them
+;; using `font-lock-keyword-face' until parsing has completed seems useful.
+;;
+(defvar pgqa-keyword-operators
+  (let ((result))
+    (dolist (op pgqa-all-operators)
+      (if (string-match "[A-Z]+" op)
+	  (push op result)))
+    result)
+  )
+
 ;; This is needed in semantic-lex-punctuation-multi analyzer.
 (defvar pgqa-max-operator-length 0
   "Maximum length among non-keyword operators")
@@ -377,15 +403,10 @@ whichever is available."
     )
 
   ;; Initialize pgqa-max-operator-length.
-  (dolist (g pgqa-operator-groups)
-    (let ((ops (cdr (cdr g))))
-      (dolist (op ops)
-
-	(if (string-match "\\s." op)
-	    (setq pgqa-max-operator-length
-		  (max pgqa-max-operator-length (string-width op))))
-	)
-      )
+  (dolist (op pgqa-all-operators)
+    (if (string-match "\\s." op)
+	(setq pgqa-max-operator-length
+	      (max pgqa-max-operator-length (string-width op))))
     )
 
   (define-lex

@@ -224,7 +224,10 @@ variables are set."
   (list (concat "\\<"
 		(mapconcat 'symbol-name
 			   (append pgqa-keyword-symbols
-				   pgqa-keywords-highlight-only)
+				   pgqa-keywords-highlight-only
+				   (mapcar 'make-symbol
+					   pgqa-keyword-operators)
+				   )
 			   "\\>\\|\\<")
 		"\\>")))
 
