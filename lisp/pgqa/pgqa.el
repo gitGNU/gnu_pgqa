@@ -88,6 +88,10 @@ variables are set."
 	  (user-error "`pgqa-join-newline' requires `pgqa-multiline-join'")))
 
   (if pgqa-multiline-operator
+      ;; XXX pgqa-multiline-query is redundant here now, but I'm not sure if
+      ;; this dependency should be removed. If pgqa-multiline-join became
+      ;; unnecessary for pgqa-multiline-operator someday, pgqa-multiline-query
+      ;; would have to be added again.
       (if (or (null pgqa-multiline-query) (null pgqa-multiline-join))
 	  (user-error "`pgqa-multiline-operator' requires both
 `pgqa-multiline-query' and `pgqa-multiline-join'")))
