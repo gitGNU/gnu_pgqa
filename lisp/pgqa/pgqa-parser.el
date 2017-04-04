@@ -112,7 +112,7 @@ characters."
 (defvar pgqa-operator-group-times
   ;; ?* isn't there on purpose. It has to be treated separate because of its
   ;; use as a wildcard. See all references to this group.
-  '(OPGROUP-1 pgqa-precedence-times "/"))
+  '(OPGROUP-TIMES pgqa-precedence-times "/"))
 
 ;; Operators defined in the pg_operator catalog are treated equally when
 ;; terminal symbols are concerned (they have the same precedence), so they all
@@ -195,22 +195,22 @@ characters."
     (setq ops-cat (append '(OPGROUP-CAT pgqa-precedence-other) ops-cat))))
 
 (defvar pgqa-operator-group-like
-  '(OPGROUP-5 pgqa-precedence-like "LIKE"))
+  '(OPGROUP-LIKE pgqa-precedence-like "LIKE"))
 
 (defvar pgqa-operator-group-cmp
-  '(OPGROUP-6 pgqa-precedence-cmp ">" "<" "=" "<=" ">=" "<>"))
+  '(OPGROUP-CMP pgqa-precedence-cmp ">" "<" "=" "<=" ">=" "<>"))
 
 (defvar pgqa-operator-group-test
-  '(OPGROUP-7 pgqa-precedence-test "IS" "ISNULL" "NOTNULL"))
+  '(OPGROUP-TEST pgqa-precedence-test "IS" "ISNULL" "NOTNULL"))
 
 (defvar pgqa-operator-group-not
-  '(OPGROUP-8 pgqa-precedence-not "NOT"))
+  '(OPGROUP-NOT pgqa-precedence-not "NOT"))
 
 (defvar pgqa-operator-group-and
-  '(OPGROUP-9 pgqa-precedence-and "AND"))
+  '(OPGROUP-AND pgqa-precedence-and "AND"))
 
 (defvar pgqa-operator-group-or
-  '(OPGROUP-10 pgqa-precedence-or "OR"))
+  '(OPGROUP-OR pgqa-precedence-or "OR"))
 
 (defvar pgqa-operator-groups
   (list pgqa-operator-group-times pgqa-operators-catalog
