@@ -786,6 +786,7 @@ indented."
 	       ;; comma operator can have a single arg, so test explicitly.
 	       (string= op ","))))
 	 (is-comma (string= op ","))
+	 (is-cast (string= op "::"))
 	 (i 0)
 	 (multiline
 	  (and
@@ -811,8 +812,8 @@ indented."
 	(if (or (and is-unary (null (oref node postfix))) (> i 0))
 	    (let ((omit-space))
 
-	      ;; Never put space in front of comma.
-	      (setq omit-space is-comma)
+	      ;; Never put space in front of comma or cast operator.
+	      (setq omit-space (or is-comma is-cast))
 
 	      ;; Should each arg start at a new line?
 	      (if multiline
@@ -830,6 +831,11 @@ indented."
 		  (pgqa-dump-start (oref node op-node) state))
 
 	      (pgqa-deparse-string state op indent)
+
+	      ;; Cast operator (::) is special in that it should not be
+	      ;; separated from the target type by space.
+	      (if is-cast
+		  (oset state next-space 0))
 
 	      (if (oref node op-node)
 		  (pgqa-dump-end (oref node op-node) state)))

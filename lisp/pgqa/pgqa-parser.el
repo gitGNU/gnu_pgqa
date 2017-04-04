@@ -86,6 +86,7 @@ characters."
 (defvar pgqa-terminal-hash nil)
 
 ;; Precedence constants. Do not use the numbers directly.
+(defconst pgqa-precedence-cast		10)
 (defconst pgqa-precedence-uminus        9)
 (defconst pgqa-precedence-times         8)
 (defconst pgqa-precedence-add           7)
@@ -109,6 +110,9 @@ characters."
 ;; equal, use separate groups too.
 ;;
 ;; Note that pgqa-precedence-uminus is not used by any group.
+(defvar pgqa-operator-group-cast
+  '(OPGROUP-CAST pgqa-precedence-cast "::"))
+
 (defvar pgqa-operator-group-times
   ;; ?* isn't there on purpose. It has to be treated separate because of its
   ;; use as a wildcard. See all references to this group.
@@ -213,7 +217,8 @@ characters."
   '(OPGROUP-OR pgqa-precedence-or "OR"))
 
 (defvar pgqa-operator-groups
-  (list pgqa-operator-group-times pgqa-operators-catalog
+  (list pgqa-operator-group-cast
+	pgqa-operator-group-times pgqa-operators-catalog
 	pgqa-operator-group-like pgqa-operator-group-cmp
 	pgqa-operator-group-test pgqa-operator-group-not
 	pgqa-operator-group-and pgqa-operator-group-or))
@@ -547,12 +552,23 @@ whichever is available."
 	   '(nonassoc ?\[ ?\])
 	   '(nonassoc ?\( ?\))
 
+	   (append '(left)
+		   ;; :: (cast operator)
+		   (pgqa-operator-group-symbols
+		    pgqa-operator-group-cast pgqa-terminal-hash))
+
+
 	   '(left ?.)
 	   )
 	  )
 
     ;; The rules are added to the beginning of the list, so high precedences
     ;; first.
+    (setq rule-sublist-1
+	  (pgqa-create-operator-rules
+	   pgqa-operator-group-cast rule-sublist-1 pgqa-terminal-hash
+	   'pgqa-create-binop-expr-rule))
+
     (setq rule-sublist-1
 	  (pgqa-create-operator-rules
 	   pgqa-operator-group-times rule-sublist-1 pgqa-terminal-hash
