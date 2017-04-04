@@ -346,7 +346,7 @@ set.
 @page
 @noindent
 @code{pgqa-multiline-operator} setting can help you understand complex
-expression. If this is set, operator expressions are printed out in
+expressions. If this is set, operator expressions are printed out in
 structured way --- exactly the way PGQA understands them:
 
 @example
