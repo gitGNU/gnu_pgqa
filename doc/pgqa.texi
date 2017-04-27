@@ -48,6 +48,7 @@ This file documents PGQA, PostgreSQL Query Analyzer.
 @menu
 * Introduction::
 * Getting Started::
+* Query Parsing::
 * Query Formatting::
 @end menu
 
@@ -103,6 +104,29 @@ mode.
 Once the mode has been activated, "PGQA" string should appear in the mode
 line.
 
+@node    Query Parsing
+@chapter Query Parsing
+
+@noindent
+If the PGQA mode is active, @kbd{C-c >} key sequence runs command
+@code{pgqa-parse}, which considers the current buffer to contain a
+single SQL query. The command parses the query string and puts the
+internal format (tree) to @code{pgqa-query-tree} buffer-local
+variable. The tree consists of nodes that represent query parts such
+as tables, joins, expressions, etc.
+
+@noindent
+In addition, the @code{pgqa-parse} function creates an overlay for
+each node and sets @code{node} property of the overlay so it points
+back to the owning node object. Thus user can move point to arbitrary
+position of the query text and find out to which nodes of the query
+tree the position belongs --- see
+@uref{https://www.gnu.org/software/emacs/manual/html_node/elisp/Overlays.html#Overlays,
+Overlays in the Emacs Lisp documentation}.
+
+@noindent
+Some of the overlays can have text properties set, typically
+@code{font-lock-face}.
 
 @node    Query Formatting
 @chapter Query Formatting
@@ -116,7 +140,7 @@ line.
 @node Interactive Mode
 @section Interactive Mode
 
-If the PGQA mode is active, @kbd{C-x <} key sequence runs command
+If the PGQA mode is active, @kbd{C-c <} key sequence runs command
 @code{pgqa-format-query}, which considers the current buffer to contain a
 single SQL query. The command parses the query string, turns the internal
 format back into text and replaces the original query with it.

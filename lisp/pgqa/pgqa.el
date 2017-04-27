@@ -151,6 +151,8 @@ variables are set."
   (let ((map (make-sparse-keymap)))
     (define-key map "<" '(menu-item "Format Query" pgqa-format-query
 				    :visible t))
+    (define-key map ">" '(menu-item "Parse Query" pgqa-parse
+				    :visible t))
     map))
 
 (defvar pgqa-mode-map
